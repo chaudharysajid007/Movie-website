@@ -3,29 +3,38 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 require('dotenv').config();
 
-// Import our custom API routes
 const contentRoutes = require('./routes/contentRoutes');
 
 const app = express();
 
-// Middleware
+// Middleware 
 app.use(express.json());
 app.use(cors());
 
-// Connect to MongoDB Atlas Cloud
+// Secure Extraction
 const mongoURI = process.env.MONGODB_URI;
+
+if (!mongoURI) {
+  console.error("❌ CRITICAL ERROR: MONGODB_URI is undefined inside production settings.");
+}
+
+// Modernized Cloud Connection Engine (Stripped of obsolete parameters)
 mongoose.connect(mongoURI)
   .then(() => console.log('🚀 SUCCESS: Connected to MongoDB Cloud Database!'))
-  .catch(err => console.error('❌ DATABASE CONNECTION ERROR:', err));
+  .catch(err => {
+    console.error('🔥 CRITICAL MONGO CONNECTION FAILURE:');
+    console.error(err.message);
+    console.error(err.stack);
+  });
 
-// Link our custom routes to a clean endpoint url
+// Routes Map
 app.use('/api/content', contentRoutes);
 
-// Base root test route
 app.get('/', (req, res) => {
   res.send('Movie Website API Engine is running perfectly online!');
 });
 
+// Production Port Binder
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
