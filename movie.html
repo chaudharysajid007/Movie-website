@@ -47,33 +47,30 @@
     </main>
 
     <script>
-        // Extract content ID and type from URL parameters (?id=XXXX&type=movie)
         const urlParams = new URLSearchParams(window.location.search);
         const contentId = urlParams.get('id');
-        const itemType = urlParams.get('type') || 'movie'; // Default to movie if type is absent
+        const itemType = urlParams.get('type') || 'movie'; 
         
-        // Dynamic fetch URL matching our upgraded backend pipeline
-        const FETCH_URL = `https://guarded-caverns-13017-b15ead89228a.herokuapp.com/api/content/${contentId}?type=${itemType}`;
-        const REQUEST_URL = `https://guarded-caverns-13017-b15ead89228a.herokuapp.com/api/content/request/${contentId}`;
+        const API_BASE = "https://guarded-caverns-13017-b15ead89228a.herokuapp.com/api/content";
+        const FETCH_URL = `${API_BASE}/${contentId}?type=${itemType}`;
+        const REQUEST_URL = `${API_BASE}/request/${contentId}`;
 
-        let globalMediaData = null; // Caches payload for the Telegram request fallback
+        let globalMediaData = null; 
 
         async function loadPageDetails() {
             if(!contentId) return;
             try {
                 const response = await fetch(FETCH_URL);
                 const data = await response.json();
-                globalMediaData = data; // Keep a backup copy of the details
+                globalMediaData = data; 
                 
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('content-container').classList.remove('hidden');
 
-                // Populate Text Elements
                 document.getElementById('media-title').innerText = data.title;
                 document.getElementById('media-desc').innerText = data.description || "No plot summary available currently.";
                 document.getElementById('media-cover').src = data.coverImageUrl;
 
-                // Render Screenshots dynamically
                 const screenBox = document.getElementById('screenshots-box');
                 screenBox.innerHTML = '';
                 if (data.screenshots && data.screenshots.length > 0) {
@@ -84,10 +81,8 @@
                     screenBox.innerHTML = `<p class="text-xs text-gray-500 italic col-span-2">No dynamic backdrop images provided.</p>`;
                 }
 
-                // Generate Custom Target Link Tree UI
                 const downloadZone = document.getElementById('download-zone');
                 
-                // 🌟 FIX: If your database DOES NOT have links for this item, show the Telegram Request interface!
                 if (!data.hasLinks) {
                     downloadZone.innerHTML = `
                         <div class="text-center py-6">
@@ -100,22 +95,24 @@
                     return;
                 }
 
-                // If links DO exist, use your original design components:
                 if (data.type === 'movie') {
-                    // FLAT MOVIE MOUNT VIEW
-                    let movieHTML = `<div class="flex flex-col gap-3">`;
-                    data.movieLinks.forEach(link => {
+                    let movieHTML = `<div class="flex flex-col gap-4">`;
+                    data.movieLinks.forEach((link, idx) => {
                         movieHTML += `
-                            <a href="${link.downloadUrl}" target="_blank" class="flex items-center justify-between bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white font-bold px-4 py-3 rounded-lg shadow transition-all duration-200">
-                                <span>Download Movie Direct Link</span>
-                                <span class="bg-black/30 px-3 py-1 rounded text-xs tracking-wider">${link.resolution}</span>
-                            </a>`;
+                            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-[#1f2937]/30 border border-gray-800/80 p-2 rounded-xl">
+                                <a href="${link.downloadUrl}" target="_blank" class="flex-1 flex items-center justify-between bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white font-bold px-4 py-3 rounded-lg shadow transition-all duration-200">
+                                    <span>Download Movie Direct Link</span>
+                                    <span class="bg-black/30 px-3 py-1 rounded text-xs tracking-wider">${link.resolution}</span>
+                                </a>
+                                <button onclick="reportBrokenLink('${data.title.replace(/'/g, "\\'")}', '${contentId}', 'movie', '${link.resolution} Main Movie Link', this)" class="bg-red-950/40 text-red-400 border border-red-900/50 px-4 py-3 sm:py-3.5 rounded-lg text-xs font-bold hover:bg-red-900 hover:text-white transition-all cursor-pointer whitespace-nowrap">
+                                    🚨 Report Broken
+                                </button>
+                            </div>`;
                     });
                     movieHTML += `</div>`;
                     downloadZone.innerHTML = movieHTML;
 
                 } else {
-                    // NESTED SERIES / ANIME ACCORDION MOUNT VIEW
                     let seriesHTML = `<div class="flex flex-col gap-4">`;
                     
                     data.seasons.forEach((season, sIdx) => {
@@ -128,26 +125,36 @@
                                 
                                 <div id="season-${sIdx}" class="hidden p-4 flex flex-col gap-4 border-t border-gray-800 bg-[#0f172a]">`;
                         
-                        season.resolutions.forEach(res => {
+                        season.resolutions.forEach((res, rIdx) => {
                             seriesHTML += `
                                 <div class="border-l-2 border-emerald-500 pl-3">
-                                    <h4 class="text-sm font-bold text-white mb-2 uppercase tracking-wide bg-gray-800 inline-block px-2 py-0.5 rounded text-xs">${res.resolution} Quality</h4>
-                                    <div class="flex flex-wrap gap-2 mb-2">`;
+                                    <div class="flex items-center justify-between mb-2">
+                                        <h4 class="text-sm font-bold text-white uppercase tracking-wide bg-gray-800 inline-block px-2 py-0.5 rounded text-xs">${res.resolution} Quality</h4>
+                                        ${res.batchLink ? `
+                                            <button onclick="reportBrokenLink('${data.title.replace(/'/g, "\\'")}', '${contentId}', 'series', 'Season ${season.seasonNumber} - ${res.resolution} Batch Folder Link', this)" class="text-[10px] bg-red-950/40 text-red-400 border border-red-900/30 px-2 py-0.5 rounded hover:bg-red-900 hover:text-white transition-colors cursor-pointer">
+                                                🚨 Report Batch Broken
+                                            </button>
+                                        ` : ''}
+                                    </div>
+                                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">`;
                                     
-                            // Map out episode link buttons
                             res.episodes.forEach(ep => {
                                 seriesHTML += `
-                                    <a href="${ep.downloadUrl}" target="_blank" class="bg-gray-800 hover:bg-emerald-600 hover:text-black border border-gray-700 text-xs px-3 py-1.5 rounded transition-all">
-                                        EP ${ep.episodeNumber}
-                                    </a>`;
+                                    <div class="flex flex-col gap-1 bg-[#111827] p-1.5 rounded border border-gray-800">
+                                        <a href="${ep.downloadUrl}" target="_blank" class="bg-gray-800 hover:bg-emerald-600 hover:text-black border border-gray-700 text-xs px-2 py-1.5 rounded transition-all font-bold text-center">
+                                            EP ${ep.episodeNumber}
+                                        </a>
+                                        <button onclick="reportBrokenLink('${data.title.replace(/'/g, "\\'")}', '${contentId}', 'series', 'Season ${season.seasonNumber} - ${res.resolution} - Episode ${ep.episodeNumber}', this)" class="text-[9px] text-red-400 hover:underline text-center cursor-pointer">
+                                            Report Dead
+                                        </button>
+                                    </div>`;
                             });
                             
                             seriesHTML += `</div>`;
                             
-                            // Check if a Batch Download folder option exists
                             if (res.batchLink) {
                                 seriesHTML += `
-                                    <a href="${res.batchLink}" target="_blank" class="inline-flex items-center text-xs text-amber-400 hover:underline font-semibold gap-1">
+                                    <a href="${res.batchLink}" target="_blank" class="inline-flex items-center text-xs text-amber-400 hover:underline font-semibold gap-1 mt-1">
                                         📦 Download Complete Season Batch (${res.resolution}) ⚡
                                     </a>`;
                             }
@@ -167,13 +174,11 @@
             }
         }
 
-        // Lightweight local view toggle controller
         function toggleAccordion(id) {
             const block = document.getElementById(id);
             block.classList.toggle('hidden');
         }
 
-        // 📬 AUTOMATED TELEGRAM REQUEST NOTIFICATION FORWARDER
         async function sendTelegramRequest() {
             if (!globalMediaData) return;
 
@@ -199,7 +204,7 @@
                 if (response.ok) {
                     btn.className = "bg-gray-800 text-gray-500 font-bold px-6 py-3 rounded-xl shadow cursor-not-allowed text-xs uppercase tracking-wider";
                     btn.innerText = "✅ Requested Successfully";
-                    statusTxt.innerText = "Sajid has been instantly pings via Telegram! Links will be up shortly.";
+                    statusTxt.innerText = "Sajid has been instantly pinged via Telegram! Links will be up shortly.";
                     statusTxt.className = "text-xs text-emerald-400 mt-3 font-medium";
                 } else {
                     throw new Error(result.message || "Request failed");
@@ -210,6 +215,40 @@
                 btn.innerText = "📨 Request Download Link";
                 statusTxt.innerText = "Failed to dispatch request. Try again later.";
                 statusTxt.className = "text-xs text-red-400 mt-3 font-medium";
+            }
+        }
+
+        // 🚨 NEW MODULE: ASYNC BROKEN LINK SYSTEM NOTIFIER
+        async function reportBrokenLink(title, tmdbId, type, details, element) {
+            if (element.disabled) return;
+            
+            const originalText = element.innerText;
+            element.disabled = true;
+            element.innerText = "⏳ Reporting...";
+
+            try {
+                // Utilizing the live request route structure to carry payload diagnostics
+                const response = await fetch(`${API_BASE}/request/${tmdbId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: `⚠️ BROKEN LINK REPORT: ${title}`,
+                        type: `${type.toUpperCase()} [Asset details: ${details}]`
+                    })
+                });
+
+                if (response.ok) {
+                    element.innerText = "✅ Reported";
+                    element.className = element.className.replace(/bg-red-950\/40|text-red-400|hover:bg-red-900/g, '') + " bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed";
+                    alert(`✅ Thank you! The issue with "${details}" has been forwarded directly to Sajid's control center.`);
+                } else {
+                    throw new Error("Report failed");
+                }
+            } catch (err) {
+                console.error(err);
+                element.disabled = false;
+                element.innerText = originalText;
+                alert("❌ Could not connect to reporting stream. Please try again later.");
             }
         }
 
