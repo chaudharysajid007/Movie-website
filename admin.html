@@ -15,6 +15,7 @@
 </head>
 <body class="p-4 sm:p-8 relative">
 
+    <!-- 🔑 PASSWORD PROTECTION GATE LOCKBOX -->
     <div id="admin-lockbox" class="fixed inset-0 bg-[#0b0f19] z-[100] flex flex-col items-center justify-center p-4">
         <div class="bg-[#111827] border border-gray-800 p-6 rounded-xl shadow-2xl max-w-sm w-full text-center">
             <h2 class="text-xl font-black text-emerald-400 mb-2">🔒 ADMIN VERIFICATION</h2>
@@ -24,6 +25,7 @@
         </div>
     </div>
 
+    <!-- MAIN MANAGEMENT DASHBOARD INTERFACE -->
     <div id="admin-content" class="hidden">
         <div class="max-w-5xl mx-auto">
             <div class="flex justify-between items-center mb-8">
@@ -32,16 +34,17 @@
             </div>
 
             <section class="form-card p-6 rounded-xl shadow-2xl mb-12">
-                <h2 id="form-heading" class="text-xl font-bold mb-6 border-b border-gray-800 pb-3">Upload New Content</h2>
+                <h2 id="form-heading" class="text-xl font-bold mb-6 border-b border-gray-800 pb-3">Upload Links via TMDb</h2>
                 
                 <form id="admin-form" class="space-y-6">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label>Title</label>
-                            <input type="text" id="title" placeholder="e.g. Interstellar" required>
+                            <label>TMDb Content ID Reference</label>
+                            <!-- 🌟 UPGRADE: Replaced title/desc/cover inputs with a single TMDb Key input -->
+                            <input type="text" id="tmdbId" placeholder="e.g. 634649" required>
                         </div>
                         <div>
-                            <label>Type</label>
+                            <label>Format Type</label>
                             <select id="type" onchange="toggleFormType()">
                                 <option value="movie">Movie</option>
                                 <option value="series">Series / Anime</option>
@@ -49,38 +52,28 @@
                         </div>
                     </div>
 
-                    <div>
-                        <label>Description</label>
-                        <textarea id="description" rows="3" placeholder="Enter storyline..."></textarea>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label>Cover Image URL</label>
-                            <input type="text" id="cover" placeholder="https://...">
-                        </div>
-                        <div>
-                            <label>Screenshots (Comma Separated URLs)</label>
-                            <input type="text" id="screenshots" placeholder="url1, url2, url3">
-                        </div>
-                    </div>
-
+                    <!-- MOVIE INTERACTIVE SECTION RESOLUTION FIELD MATRIX -->
                     <div id="movie-section" class="bg-gray-900/50 p-4 rounded-lg">
                         <h3 class="font-bold text-sm text-emerald-400 mb-4 uppercase">Movie Download Links</h3>
                         <div id="movie-links-container" class="space-y-3"></div>
                         <button type="button" onclick="addMovieLinkField()" class="mt-3 text-xs bg-emerald-600 px-3 py-1 rounded font-bold text-black cursor-pointer">+ Add Resolution</button>
                     </div>
 
+                    <!-- SERIES EPISODIC INTERACTIVE NESTED SECTION GRID MATRIX -->
                     <div id="series-section" class="hidden bg-gray-900/50 p-4 rounded-lg space-y-4">
                         <h3 class="font-bold text-sm text-emerald-400 mb-2 uppercase">Series/Anime Seasons Breakdown</h3>
                         <div id="seasons-container" class="space-y-6"></div>
                         <button type="button" onclick="addSeason()" class="w-full py-2 border-2 border-dashed border-gray-700 rounded-lg text-gray-500 font-bold hover:border-emerald-500 hover:text-emerald-500 cursor-pointer">+ Add Season</button>
                     </div>
 
-                    <button type="submit" id="submit-btn" class="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-black py-3 rounded-lg transition-colors shadow-lg cursor-pointer">🚀 PUBLISH TO WEBSITE</button>
+                    <div class="flex gap-3 justify-end">
+                        <button id="btn-cancel-edit" type="button" onclick="resetFormState()" class="hidden bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold px-5 py-2 rounded-lg text-xs cursor-pointer">Cancel Edit</button>
+                        <button type="submit" id="submit-btn" class="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-black py-3 rounded-lg transition-colors shadow-lg cursor-pointer">🚀 PUBLISH DOWNLOAD MATRIX</button>
+                    </div>
                 </form>
             </section>
 
+            <!-- DATABASE SYNCHRONIZED ENTRIES DIRECTORY -->
             <section class="form-card p-6 rounded-xl">
                 <h2 class="text-xl font-bold mb-6">Manage Existing Content</h2>
                 <div id="admin-list" class="space-y-3"></div>
@@ -92,9 +85,8 @@
         const API_URL = "https://guarded-caverns-13017-b15ead89228a.herokuapp.com/api/content";
         const form = document.getElementById('admin-form');
         let seasonCount = 0;
-        let editingId = null; // 🔄 Tracks if an entry is being modified
+        let editingId = null; 
 
-        // 🔑 Checks password directly against Heroku Config Var
         async function verifyAdminKey() {
             const inputKey = document.getElementById('admin-secret-key').value;
 
@@ -115,7 +107,7 @@
                     window.location.href = "index.html";
                 }
             } catch (err) {
-                alert("Server verification failed. Try restarting Heroku.");
+                alert("Server verification failed.");
             }
         }
 
@@ -192,27 +184,31 @@
             e.preventDefault();
             const type = document.getElementById('type').value;
             
+            // 🌟 UPGRADE: Dynamic construction mapping target inputs directly over tmdbId payload fields
             const payload = {
-                title: document.getElementById('title').value,
+                tmdbId: document.getElementById('tmdbId').value.trim(),
                 type: type,
-                description: document.getElementById('description').value,
-                coverImageUrl: document.getElementById('cover').value,
-                screenshots: document.getElementById('screenshots').value.split(',').map(s => s.trim()),
                 movieLinks: [],
                 seasons: []
             };
 
             if(type === 'movie') {
                 document.querySelectorAll('.movie-link-item').forEach(el => {
-                    payload.movieLinks.push({ resolution: el.querySelector('.res-val').value, downloadUrl: el.querySelector('.url-val').value });
+                    const downloadUrl = el.querySelector('.url-val').value.trim();
+                    if(downloadUrl) {
+                        payload.movieLinks.push({ resolution: el.querySelector('.res-val').value, downloadUrl });
+                    }
                 });
             } else {
                 document.querySelectorAll('.season-item').forEach(sEl => {
                     const season = { seasonNumber: sEl.querySelector('.s-num').value, resolutions: [] };
                     sEl.querySelectorAll('.res-item').forEach(rEl => {
-                        const res = { resolution: rEl.querySelector('.r-val').value, batchLink: rEl.querySelector('.b-link').value, episodes: [] };
+                        const res = { resolution: rEl.querySelector('.r-val').value, batchLink: rEl.querySelector('.b-link').value.trim(), episodes: [] };
                         rEl.querySelectorAll('.ep-item').forEach(eEl => {
-                            res.episodes.push({ episodeNumber: eEl.querySelector('.e-num').value, downloadUrl: eEl.querySelector('.e-url').value });
+                            const downloadUrl = eEl.querySelector('.e-url').value.trim();
+                            if(downloadUrl) {
+                                res.episodes.push({ episodeNumber: eEl.querySelector('.e-num').value, downloadUrl });
+                            }
                         });
                         season.resolutions.push(res);
                     });
@@ -220,24 +216,29 @@
                 });
             }
 
-            // 🔄 Select endpoint and method based on whether editing or adding new content
             const targetUrl = editingId ? `${API_URL}/edit/${editingId}` : `${API_URL}/add`;
             const targetMethod = editingId ? 'PUT' : 'POST';
 
-            const res = await fetch(targetUrl, {
-                method: targetMethod,
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'X-Admin-Password': sessionStorage.getItem('adminKey') 
-                },
-                body: JSON.stringify(payload)
-            });
+            try {
+                const res = await fetch(targetUrl, {
+                    method: targetMethod,
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-Admin-Password': sessionStorage.getItem('adminKey') 
+                    },
+                    body: JSON.stringify(payload)
+                });
 
-            if(res.ok) { 
-                alert(editingId ? '✅ Content Updated Successfully!' : '✅ Published Successfully!'); 
-                location.reload(); 
-            } else {
-                alert(`❌ ERROR: Submission Failed.`);
+                if(res.ok) { 
+                    alert(editingId ? '✅ Links Content Map Updated!' : '✅ Download Streams Published Successfully!'); 
+                    resetFormState();
+                    loadAdminList();
+                } else {
+                    const errRes = await res.json();
+                    alert(`❌ ERROR: ${errRes.message || 'Submission failed.'}`);
+                }
+            } catch (err) {
+                console.error(err);
             }
         };
 
@@ -247,13 +248,17 @@
                 const data = await res.json();
                 const list = document.getElementById('admin-list');
                 list.innerHTML = ""; 
+                if(data.length === 0) {
+                    list.innerHTML = `<p class="text-xs text-gray-500 italic text-center py-4">No content links indexed in backend database cluster.</p>`;
+                    return;
+                }
                 data.forEach(item => {
                     list.innerHTML += `
                         <div class="flex justify-between items-center bg-gray-900 p-3 rounded border border-gray-800">
-                            <span class="text-sm font-bold">${item.title} (${item.type})</span>
+                            <span class="text-sm font-bold font-mono text-emerald-400">ID Key: ${item._id} <span class="text-gray-400 font-sans font-normal">(${item.type})</span></span>
                             <div class="flex gap-2">
-                                <button onclick="startEdit('${item._id}')" class="bg-blue-900/50 text-blue-400 text-xs px-3 py-1 rounded cursor-pointer">Edit</button>
-                                <button onclick="deleteItem('${item._id}')" class="bg-red-900/50 text-red-500 text-xs px-3 py-1 rounded cursor-pointer">Delete</button>
+                                <button onclick="startEdit('${item._id}', '${item.type}')" class="bg-blue-900/50 text-blue-400 text-xs px-3 py-1 rounded cursor-pointer hover:bg-blue-800/60 transition-colors">Edit Links</button>
+                                <button onclick="deleteItem('${item._id}')" class="bg-red-900/50 text-red-500 text-xs px-3 py-1 rounded cursor-pointer hover:bg-red-800/60 transition-colors">Wipe Link</button>
                             </div>
                         </div>
                     `;
@@ -263,26 +268,22 @@
             }
         }
 
-        // 🔄 Fetch targeted content items and build dynamic frontend structures inside forms
-        async function startEdit(id) {
+        async function startEdit(id, type) {
             try {
-                const res = await fetch(`${API_URL}/${id}`);
-                if (!res.ok) throw new Error("Could not fetch details");
+                const res = await fetch(`${API_URL}/${id}?type=${type}`);
+                if (!res.ok) throw new Error("Could not fetch link configurations mappings context");
                 const item = await res.json();
 
                 editingId = id;
                 
-                // Populate basic configurations
-                document.getElementById('title').value = item.title;
-                document.getElementById('type').value = item.type;
-                document.getElementById('description').value = item.description || '';
-                document.getElementById('cover').value = item.coverImageUrl || '';
-                document.getElementById('screenshots').value = item.screenshots ? item.screenshots.join(', ') : '';
+                document.getElementById('tmdbId').value = id;
+                document.getElementById('tmdbId').disabled = true; // Lock core structural routing index keys
+                document.getElementById('type').value = type;
+                document.getElementById('type').disabled = true;
 
                 toggleFormType();
 
-                // Reconstruct Movie UI Subnodes
-                if (item.type === 'movie') {
+                if (type === 'movie') {
                     document.getElementById('movie-links-container').innerHTML = "";
                     if (item.movieLinks && item.movieLinks.length > 0) {
                         item.movieLinks.forEach(link => addMovieLinkField(link.resolution, link.downloadUrl));
@@ -290,8 +291,7 @@
                         addMovieLinkField();
                     }
                 } 
-                // Reconstruct Series/Anime Subnodes
-                else if (item.type === 'series' && item.seasons) {
+                else if (type === 'series' && item.seasons) {
                     document.getElementById('seasons-container').innerHTML = "";
                     seasonCount = 0;
                     item.seasons.forEach(season => {
@@ -307,18 +307,18 @@
                     });
                 }
 
-                // Smoothly switch interface typography context labels
-                document.getElementById('form-heading').innerText = `🔄 Editing Content: ${item.title}`;
-                document.getElementById('submit-btn').innerText = "💾 SAVE MODIFICATIONS";
+                document.getElementById('form-heading').innerText = `🔄 Editing Links Configuration Parameters (Target ID: ${id})`;
+                document.getElementById('submit-btn').innerText = "💾 SAVE CONFIGURATION CHANGES";
+                document.getElementById('btn-cancel-edit').classList.remove('hidden');
                 document.getElementById('form-heading').scrollIntoView({ behavior: 'smooth' });
 
             } catch (err) {
-                alert("❌ Failed to pull item information structure into active context.");
+                alert("❌ Failed to pull link item information configuration map structure.");
             }
         }
 
         async function deleteItem(id) {
-            if(confirm('Delete this entry permanently?')) {
+            if(confirm(`Wipe links mapping context profiles index for TMDb ID: ${id}?`)) {
                 const res = await fetch(`${API_URL}/delete/${id}`, { 
                     method: 'DELETE',
                     headers: {
@@ -326,11 +326,27 @@
                     }
                 });
                 if(res.ok) {
-                    location.reload();
+                    loadAdminList();
+                    if(editingId === id) resetFormState();
                 } else {
                     alert("Failed to delete item.");
                 }
             }
+        }
+
+        function resetFormState() {
+            editingId = null;
+            document.getElementById('form-heading').innerText = "Upload Links via TMDb";
+            document.getElementById('submit-btn').innerText = "🚀 PUBLISH DOWNLOAD MATRIX";
+            document.getElementById('btn-cancel-edit').classList.add('hidden');
+            document.getElementById('tmdbId').disabled = false;
+            document.getElementById('type').disabled = false;
+            form.reset();
+            document.getElementById('movie-links-container').innerHTML = "";
+            document.getElementById('seasons-container').innerHTML = "";
+            seasonCount = 0;
+            addMovieLinkField();
+            toggleFormType();
         }
 
         window.onload = () => { addMovieLinkField(); };
