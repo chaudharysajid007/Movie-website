@@ -104,4 +104,17 @@ router.delete('/delete/:id', async (req, res) => {
   }
 });
 
+// 🔒 LOGIN ROUTE: Validates the password against Heroku Config Vars
+router.post('/verify-password', (req, res) => {
+  const { password } = req.body;
+  const secureMasterPassword = process.env.ADMIN_PASSWORD;
+
+  if (password && password === secureMasterPassword) {
+    return res.json({ success: true, message: "Access Granted" });
+  } else {
+    return res.status(401).json({ success: false, message: "Invalid Password" });
+  }
+});
+
+
 module.exports = router;

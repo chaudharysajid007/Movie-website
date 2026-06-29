@@ -15,6 +15,7 @@
 </head>
 <body class="p-4 sm:p-8 relative">
 
+    <!-- 🔒 THE ONLY LOGIN GATE YOU WILL SEE -->
     <div id="admin-lockbox" class="fixed inset-0 bg-[#0b0f19] z-[100] flex flex-col items-center justify-center p-4">
         <div class="bg-[#111827] border border-gray-800 p-6 rounded-xl shadow-2xl max-w-sm w-full text-center">
             <h2 class="text-xl font-black text-emerald-400 mb-2">🔒 ADMIN VERIFICATION</h2>
@@ -24,6 +25,7 @@
         </div>
     </div>
 
+    <!-- MAIN DASHBOARD Layout (Hidden until verified) -->
     <div id="admin-content" class="hidden">
         <div class="max-w-5xl mx-auto">
             <div class="flex justify-between items-center mb-8">
@@ -93,24 +95,34 @@
         const form = document.getElementById('admin-form');
         let seasonCount = 0;
 
-        // 🔒 Unlocks UI and ONLY then loads items from your API
-        function verifyAdminKey() {
+        // 🔑 Checks password directly against Heroku Config Var
+        async function verifyAdminKey() {
             const inputKey = document.getElementById('admin-secret-key').value;
 
-            if (!inputKey) {
-                alert("Please enter a password!");
-                return;
+            try {
+                const res = await fetch(`${API_URL}/verify-password`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: inputKey })
+                });
+
+                if (res.ok) {
+                    // Password matches perfectly! Store it quietly for network tasks
+                    sessionStorage.setItem('adminKey', inputKey);
+                    
+                    // Reveal dashboard setup
+                    document.getElementById('admin-lockbox').remove();
+                    document.getElementById('admin-content').classList.remove('hidden');
+                    
+                    // Fetch items list smoothly
+                    loadAdminList();
+                } else {
+                    alert("❌ ACCESS DENIED: Invalid Admin Password.");
+                    window.location.href = "index.html";
+                }
+            } catch (err) {
+                alert("Server verification failed. Try restarting Heroku.");
             }
-
-            // Save typed value to session memory
-            sessionStorage.setItem('adminKey', inputKey);
-
-            // Open up the panel view structure
-            document.getElementById('admin-lockbox').remove();
-            document.getElementById('admin-content').classList.remove('hidden');
-
-            // NOW it is safe to load items from the database!
-            loadAdminList();
         }
 
         function toggleFormType() {
@@ -119,7 +131,6 @@
             document.getElementById('series-section').classList.toggle('hidden', type !== 'series');
         }
 
-        // --- MOVIE LINK LOGIC ---
         function addMovieLinkField() {
             const container = document.getElementById('movie-links-container');
             const div = document.createElement('div');
@@ -131,7 +142,6 @@
             container.appendChild(div);
         }
 
-        // --- SERIES NESTED LOGIC ---
         function addSeason() {
             seasonCount++;
             const container = document.getElementById('seasons-container');
@@ -174,7 +184,6 @@
             container.appendChild(eDiv);
         }
 
-        // --- SUBMIT LOGIC ---
         form.onsubmit = async (e) => {
             e.preventDefault();
             const type = document.getElementById('type').value;
@@ -220,18 +229,16 @@
                 alert('✅ Published Successfully!'); 
                 location.reload(); 
             } else {
-                const errData = await res.json();
-                alert(`❌ ERROR: ${errData.message}`);
+                alert(`❌ ERROR: Post Submission Failed.`);
             }
         };
 
-        // --- LIST / DELETE LOGIC ---
         async function loadAdminList() {
             try {
                 const res = await fetch(API_URL);
                 const data = await res.json();
                 const list = document.getElementById('admin-list');
-                list.innerHTML = ""; // Clear list
+                list.innerHTML = ""; 
                 data.forEach(item => {
                     list.innerHTML += `
                         <div class="flex justify-between items-center bg-gray-900 p-3 rounded border border-gray-800">
@@ -261,7 +268,6 @@
             }
         }
 
-        // Only render layout forms on load, keep list calls away until verification!
         window.onload = () => { addMovieLinkField(); };
     </script>
 </body>
