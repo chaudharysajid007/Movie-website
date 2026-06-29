@@ -37,8 +37,10 @@ router.get('/:id', async (req, res) => {
     if (!item) return res.status(404).json({ message: 'Content not found' });
     res.json(item);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+  console.error("🔥 DATABASE CRASH ERROR:", err);
+  res.status(400).json({ message: err.message, error: err });
   }
+
 });
 
 // ==========================================
