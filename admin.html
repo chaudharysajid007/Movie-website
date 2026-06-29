@@ -13,7 +13,19 @@
         label { display: block; font-size: 12px; font-weight: bold; color: #9ca3af; margin-bottom: 4px; text-transform: uppercase; }
     </style>
 </head>
-<body class="p-4 sm:p-8">
+<body class="p-4 sm:p-8 relative">
+
+    <div id="admin-lockbox" class="fixed inset-0 bg-[#0b0f19] z-[100] flex flex-col items-center justify-center p-4">
+        <div class="bg-[#111827] border border-gray-800 p-6 rounded-xl shadow-2xl max-w-sm w-full text-center">
+            <h2 class="text-xl font-black text-emerald-400 mb-2">🔒 ADMIN VERIFICATION</h2>
+            <p class="text-xs text-gray-400 mb-4">Authorized Personnel Only</p>
+            <input type="password" id="admin-secret-key" placeholder="Enter Admin Password" class="mb-4 text-center">
+            <button type="button" onclick="verifyAdminKey()" class="w-full bg-emerald-500 text-black font-bold py-2 rounded-lg">UNLOCK PANEL</button>
+        </div>
+    </div>
+
+    <div id="admin-content" class="hidden">
+    
 
     <div class="max-w-5xl mx-auto">
         <div class="flex justify-between items-center mb-8">
@@ -78,6 +90,19 @@
     </div>
 
     <script>
+    function verifyAdminKey() {
+    const inputKey = document.getElementById('admin-secret-key').value;
+    const MASTER_PASSWORD = "sajid_secret_movies_2026"; 
+
+    if (inputKey === MASTER_PASSWORD) {
+        document.getElementById('admin-lockbox').remove();
+        document.getElementById('admin-content').classList.remove('hidden');
+    } else {
+        alert("❌ ACCESS DENIED: Invalid Credentials.");
+        window.location.href = "index.html";
+    }
+}
+
         const API_URL = "https://guarded-caverns-13017-b15ead89228a.herokuapp.com/api/content";
         const form = document.getElementById('admin-form');
         let seasonCount = 0;
@@ -209,5 +234,6 @@
 
         window.onload = () => { addMovieLinkField(); loadAdminList(); };
     </script>
+        </div>
 </body>
 </html>
