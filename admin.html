@@ -15,7 +15,6 @@
 </head>
 <body class="p-4 sm:p-8 relative">
 
-    <!-- 🔑 PASSWORD PROTECTION GATE LOCKBOX -->
     <div id="admin-lockbox" class="fixed inset-0 bg-[#0b0f19] z-[100] flex flex-col items-center justify-center p-4">
         <div class="bg-[#111827] border border-gray-800 p-6 rounded-xl shadow-2xl max-w-sm w-full text-center">
             <h2 class="text-xl font-black text-emerald-400 mb-2">🔒 ADMIN VERIFICATION</h2>
@@ -25,7 +24,6 @@
         </div>
     </div>
 
-    <!-- MAIN MANAGEMENT DASHBOARD INTERFACE -->
     <div id="admin-content" class="hidden">
         <div class="max-w-5xl mx-auto">
             <div class="flex justify-between items-center mb-8">
@@ -40,7 +38,6 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label>TMDb Content ID Reference</label>
-                            <!-- 🌟 UPGRADE: Replaced title/desc/cover inputs with a single TMDb Key input -->
                             <input type="text" id="tmdbId" placeholder="e.g. 634649" required>
                         </div>
                         <div>
@@ -52,14 +49,12 @@
                         </div>
                     </div>
 
-                    <!-- MOVIE INTERACTIVE SECTION RESOLUTION FIELD MATRIX -->
                     <div id="movie-section" class="bg-gray-900/50 p-4 rounded-lg">
                         <h3 class="font-bold text-sm text-emerald-400 mb-4 uppercase">Movie Download Links</h3>
                         <div id="movie-links-container" class="space-y-3"></div>
                         <button type="button" onclick="addMovieLinkField()" class="mt-3 text-xs bg-emerald-600 px-3 py-1 rounded font-bold text-black cursor-pointer">+ Add Resolution</button>
                     </div>
 
-                    <!-- SERIES EPISODIC INTERACTIVE NESTED SECTION GRID MATRIX -->
                     <div id="series-section" class="hidden bg-gray-900/50 p-4 rounded-lg space-y-4">
                         <h3 class="font-bold text-sm text-emerald-400 mb-2 uppercase">Series/Anime Seasons Breakdown</h3>
                         <div id="seasons-container" class="space-y-6"></div>
@@ -73,7 +68,6 @@
                 </form>
             </section>
 
-            <!-- DATABASE SYNCHRONIZED ENTRIES DIRECTORY -->
             <section class="form-card p-6 rounded-xl">
                 <h2 class="text-xl font-bold mb-6">Manage Existing Content</h2>
                 <div id="admin-list" class="space-y-3"></div>
@@ -183,10 +177,12 @@
         form.onsubmit = async (e) => {
             e.preventDefault();
             const type = document.getElementById('type').value;
+            const tmdbVal = document.getElementById('tmdbId').value.trim();
             
-            // 🌟 UPGRADE: Dynamic construction mapping target inputs directly over tmdbId payload fields
+            // 🌟 FIXED PAYLOAD: Mapping both parameters securely for API route validation matching
             const payload = {
-                tmdbId: document.getElementById('tmdbId').value.trim(),
+                id: tmdbVal,
+                tmdbId: tmdbVal,
                 type: type,
                 movieLinks: [],
                 seasons: []
@@ -277,7 +273,7 @@
                 editingId = id;
                 
                 document.getElementById('tmdbId').value = id;
-                document.getElementById('tmdbId').disabled = true; // Lock core structural routing index keys
+                document.getElementById('tmdbId').disabled = true; 
                 document.getElementById('type').value = type;
                 document.getElementById('type').disabled = true;
 
