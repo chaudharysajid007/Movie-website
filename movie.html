@@ -47,34 +47,60 @@
     </main>
 
     <script>
-        // Extract content ID variable directly from URL parameters
+        // Extract content ID and type from URL parameters (?id=XXXX&type=movie)
         const urlParams = new URLSearchParams(window.location.search);
         const contentId = urlParams.get('id');
-        const FETCH_URL = `https://guarded-caverns-13017-b15ead89228a.herokuapp.com/api/content/${contentId}`;
+        const itemType = urlParams.get('type') || 'movie'; // Default to movie if type is absent
+        
+        // Dynamic fetch URL matching our upgraded backend pipeline
+        const FETCH_URL = `https://guarded-caverns-13017-b15ead89228a.herokuapp.com/api/content/${contentId}?type=${itemType}`;
+        const REQUEST_URL = `https://guarded-caverns-13017-b15ead89228a.herokuapp.com/api/content/request/${contentId}`;
+
+        let globalMediaData = null; // Caches payload for the Telegram request fallback
 
         async function loadPageDetails() {
             if(!contentId) return;
             try {
                 const response = await fetch(FETCH_URL);
                 const data = await response.json();
+                globalMediaData = data; // Keep a backup copy of the details
                 
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('content-container').classList.remove('hidden');
 
                 // Populate Text Elements
                 document.getElementById('media-title').innerText = data.title;
-                document.getElementById('media-desc').innerText = data.description;
+                document.getElementById('media-desc').innerText = data.description || "No plot summary available currently.";
                 document.getElementById('media-cover').src = data.coverImageUrl;
 
-                // Render Screenshots
+                // Render Screenshots dynamically
                 const screenBox = document.getElementById('screenshots-box');
-                data.screenshots.forEach(url => {
-                    screenBox.innerHTML += `<img src="${url}" class="rounded border border-gray-800 hover:scale-102 transition-transform shadow w-full aspect-video object-cover">`;
-                });
+                screenBox.innerHTML = '';
+                if (data.screenshots && data.screenshots.length > 0) {
+                    data.screenshots.forEach(url => {
+                        screenBox.innerHTML += `<img src="${url}" class="rounded border border-gray-800 hover:scale-102 transition-transform shadow w-full aspect-video object-cover">`;
+                    });
+                } else {
+                    screenBox.innerHTML = `<p class="text-xs text-gray-500 italic col-span-2">No dynamic backdrop images provided.</p>`;
+                }
 
                 // Generate Custom Target Link Tree UI
                 const downloadZone = document.getElementById('download-zone');
                 
+                // 🌟 FIX: If your database DOES NOT have links for this item, show the Telegram Request interface!
+                if (!data.hasLinks) {
+                    downloadZone.innerHTML = `
+                        <div class="text-center py-6">
+                            <p class="text-gray-400 text-sm mb-4">We don't have download links uploaded for this title yet.</p>
+                            <button id="btn-request" onclick="sendTelegramRequest()" class="bg-emerald-500 hover:bg-emerald-600 text-black font-extrabold px-6 py-3 rounded-xl shadow transition-all transform active:scale-95 text-xs uppercase tracking-wider cursor-pointer">
+                                📨 Request Download Link
+                            </button>
+                            <p id="request-status" class="text-xs text-emerald-400 mt-3 hidden font-medium"></p>
+                        </div>`;
+                    return;
+                }
+
+                // If links DO exist, use your original design components:
                 if (data.type === 'movie') {
                     // FLAT MOVIE MOUNT VIEW
                     let movieHTML = `<div class="flex flex-col gap-3">`;
@@ -145,6 +171,46 @@
         function toggleAccordion(id) {
             const block = document.getElementById(id);
             block.classList.toggle('hidden');
+        }
+
+        // 📬 AUTOMATED TELEGRAM REQUEST NOTIFICATION FORWARDER
+        async function sendTelegramRequest() {
+            if (!globalMediaData) return;
+
+            const btn = document.getElementById('btn-request');
+            const statusTxt = document.getElementById('request-status');
+
+            btn.disabled = true;
+            btn.innerText = "⏳ Requesting...";
+
+            try {
+                const response = await fetch(REQUEST_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: globalMediaData.title,
+                        type: globalMediaData.type
+                    })
+                });
+
+                const result = await response.json();
+                statusTxt.classList.remove('hidden');
+
+                if (response.ok) {
+                    btn.className = "bg-gray-800 text-gray-500 font-bold px-6 py-3 rounded-xl shadow cursor-not-allowed text-xs uppercase tracking-wider";
+                    btn.innerText = "✅ Requested Successfully";
+                    statusTxt.innerText = "Sajid has been instantly pings via Telegram! Links will be up shortly.";
+                    statusTxt.className = "text-xs text-emerald-400 mt-3 font-medium";
+                } else {
+                    throw new Error(result.message || "Request failed");
+                }
+            } catch (err) {
+                console.error(err);
+                btn.disabled = false;
+                btn.innerText = "📨 Request Download Link";
+                statusTxt.innerText = "Failed to dispatch request. Try again later.";
+                statusTxt.className = "text-xs text-red-400 mt-3 font-medium";
+            }
         }
 
         window.onload = () => loadPageDetails();
