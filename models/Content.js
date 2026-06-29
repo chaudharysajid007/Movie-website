@@ -12,7 +12,7 @@ const EpisodeSchema = new mongoose.Schema({
   downloadUrl: { type: String, required: true }
 });
 
-// 3. Blueprint for Series Resolutions (Contains Episode links and Batch link)
+// 3. Blueprint for Series Resolutions
 const ResolutionSchema = new mongoose.Schema({
   resolution: { type: String, required: true, enum: ['480p', '720p', '1080p'] },
   batchLink: { type: String, default: null }, 
@@ -25,22 +25,26 @@ const SeasonSchema = new mongoose.Schema({
   resolutions: [ResolutionSchema] 
 });
 
-// 5. Main Content Blueprint (Combines everything together)
+// 5. Main Smart Content Blueprint
 const ContentSchema = new mongoose.Schema({
-  title: { type: String, required: true, trim: true },
-  type: { type: String, required: true, enum: ['movie', 'series', 'anime'] },
-  description: { type: String, required: true },
-  coverImageUrl: { type: String, required: true },
-  screenshots: [{ type: String }], 
+  // 🌟 THE ANCHOR: This links your downloads directly to TMDb's library
+  tmdbId: { 
+    type: String, 
+    required: true, 
+    unique: true 
+  },
+  // Keeps track of the format for easier system filtering
+  type: { 
+    type: String, 
+    required: true, 
+    enum: ['movie', 'series', 'anime'] 
+  },
   
-  // Conditional fields depending on the item type
+  // Your original link structures are perfectly preserved!
   movieLinks: [MovieDownloadSchema], // Used ONLY if type is 'movie'
   seasons: [SeasonSchema],          // Used ONLY if type is 'series' or 'anime'
   
   createdAt: { type: Date, default: Date.now }
 });
-
-// Create a text index so users can search titles quickly
-ContentSchema.index({ title: 'text', description: 'text' });
 
 module.exports = mongoose.model('Content', ContentSchema);
