@@ -39,6 +39,9 @@
         const loadingSpinner = document.getElementById('loading');
         const searchBar = document.getElementById('search-bar');
         const sectionTitle = document.getElementById('section-title');
+        
+        // ⏱️ Debounce Tracker to stop matching network requests from racing
+        let searchTimer;
 
         // Function to Fetch and Render items onto the UI
         async function fetchCatalog(url = API_BASE_URL) {
@@ -64,7 +67,7 @@
 
                     card.innerHTML = `
                         <div class="relative overflow-hidden aspect-[2/3]">
-                            <img src="${item.coverImageUrl}" alt="${item.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 loading="lazy"">
+                            <img src="${item.coverImageUrl}" alt="${item.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy">
                             <span class="absolute top-2 left-2 bg-emerald-500 text-black text-[10px] font-bold uppercase px-2 py-0.5 rounded shadow">
                                 ${item.type}
                             </span>
@@ -81,16 +84,23 @@
             }
         }
 
-        // Live Real-Time Search Event Listener
+        // Smart Live Real-Time Search Event Listener (With Debounce Fix)
         searchBar.addEventListener('input', (e) => {
             const query = e.target.value.trim();
-            if(query.length > 1) {
-                sectionTitle.innerText = `SEARCH RESULTS FOR: "${query.toUpperCase()}"`;
-                fetchCatalog(`${API_BASE_URL}/search?q=${query}`);
-            } else if (query.length === 0) {
-                sectionTitle.innerText = "LATEST UPLOADS";
-                fetchCatalog();
-            }
+            
+            // Clear the timer every time a new letter is typed
+            clearTimeout(searchTimer);
+
+            // Wait 300ms after the user stops typing before calling the backend
+            searchTimer = setTimeout(() => {
+                if(query.length >= 1) {
+                    sectionTitle.innerText = `SEARCH RESULTS FOR: "${query.toUpperCase()}"`;
+                    fetchCatalog(`${API_BASE_URL}/search?q=${query}`);
+                } else if (query.length === 0) {
+                    sectionTitle.innerText = "LATEST UPLOADS";
+                    fetchCatalog();
+                }
+            }, 300); // 300 milliseconds delay
         });
 
         // Initialize display on window load
