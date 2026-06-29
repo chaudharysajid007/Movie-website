@@ -16,19 +16,27 @@ router.get('/', async (req, res) => {
   }
 });
 
-// 2. Real-time Search Route
+// 2. Real-time Search Route (Instant letter-by-letter partial filtering)
 router.get('/search', async (req, res) => {
-  const { q } = req.query; // e.g., /api/content/search?q=anime
+  const { q } = req.query; // e.g., /api/content/search?q=fro
   try {
-    const results = await Content.find(
-      { $text: { $search: q } },
-      { score: { $meta: "textScore" } }
-    ).sort({ score: { $meta: "textScore" } });
+    // If the search bar is cleared, return an empty array or all items
+    if (!q) {
+      return res.json([]);
+    }
+
+    // $regex looks for the typed string anywhere inside the title
+    // 'i' makes it case-insensitive so typing 'f' or 'F' works identically
+    const results = await Content.find({
+      title: { $regex: q, $options: 'i' }
+    });
+    
     res.json(results);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
+
 
 // 3. Get single item details (The Download Page layout data)
 router.get('/:id', async (req, res) => {
