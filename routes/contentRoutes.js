@@ -37,26 +37,37 @@ router.get('/:id', async (req, res) => {
     if (!item) return res.status(404).json({ message: 'Content not found' });
     res.json(item);
   } catch (err) {
-  console.error("🔥 DATABASE CRASH ERROR:", err);
-  res.status(400).json({ message: err.message, error: err });
+    console.error("🔥 DATABASE CRASH ERROR:", err);
+    res.status(400).json({ message: err.message, error: err });
   }
-
 });
 
 // ==========================================
 // ADMIN PANEL ROUTES (Management Operations)
 // ==========================================
 
-// 4. UPLOAD: Create new movie, series, or anime
+// 4. UPLOAD: Create new movie, series, or anime (🔒 SECURED WITH PASSWORD)
 router.post('/add', async (req, res) => {
+  // 🔒 1. Extract password from incoming network headers
+  const clientPassword = req.headers['x-admin-password'];
+  
+  // 🔒 2. Grab the true password hidden inside Heroku's configuration vault
+  const secureMasterPassword = process.env.ADMIN_PASSWORD;
+
+  // 🔒 3. Compare them. If they don't match, block the user immediately!
+  if (!clientPassword || clientPassword !== secureMasterPassword) {
+    return res.status(401).json({ message: "Unauthorized: Invalid Admin Password" });
+  }
+
+  // 4. If password matches, proceed with building and saving the movie structure
   const item = new Content({
     title: req.body.title,
     type: req.body.type,
     description: req.body.description,
     coverImageUrl: req.body.coverImageUrl,
     screenshots: req.body.screenshots,
-    movieLinks: req.body.movieLinks, // Passed empty if it is a series
-    seasons: req.body.seasons        // Passed empty if it is a movie
+    movieLinks: req.body.movieLinks, 
+    seasons: req.body.seasons        
   });
 
   try {
@@ -73,7 +84,7 @@ router.put('/edit/:id', async (req, res) => {
     const updatedItem = await Content.findByIdAndUpdate(
       req.params.id, 
       req.body, 
-      { new: true } // Returns the newly modified object back immediately
+      { new: true } 
     );
     if (!updatedItem) return res.status(404).json({ message: 'Content not found' });
     res.json(updatedItem);
