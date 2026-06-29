@@ -7,7 +7,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <style>
         body { background-color: #0b0f19; color: #e2e8f0; }
-        
     </style>
 </head>
 <body class="relative min-h-screen">
@@ -18,7 +17,6 @@
         <div>
             <div class="flex justify-between items-center mb-8 pb-4 border-b border-gray-800">
                 <span class="text-emerald-400 font-black tracking-wider text-xl pl-2">Sajidflix</span>
-
                 <button onclick="toggleSidebar()" class="text-gray-400 hover:text-white text-xl cursor-pointer">✕</button>
             </div>
             
@@ -38,13 +36,13 @@
 
     <header class="border-b border-gray-800 bg-[#111827] sticky top-0 z-50 px-4 py-3 shadow-lg">
         <div class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-            
             <div class="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
                 <button onclick="toggleSidebar()" class="text-2xl text-gray-300 hover:text-emerald-400 cursor-pointer focus:outline-none" title="Open Menu">
                     ☰
                 </button>
                 <h1 class="text-2xl font-black tracking-wider text-emerald-400 cursor-pointer" onclick="window.location.reload()">SAJID<span class="text-white">FLIX</span></h1>
-                <div class="sm:hidden"></div> </div>
+                <div class="sm:hidden"></div> 
+            </div>
             
             <div class="relative w-full sm:w-72">
                 <input id="search-bar" type="text" placeholder="Search movies, anime, series..." 
@@ -70,8 +68,6 @@
         const loadingSpinner = document.getElementById('loading');
         const searchBar = document.getElementById('search-bar');
         const sectionTitle = document.getElementById('section-title');
-        
-        // Sidebar elements references
         const sidebarMenu = document.getElementById('sidebar-menu');
         const sidebarOverlay = document.getElementById('sidebar-overlay');
         
@@ -80,48 +76,14 @@
         // 🍔 SIDEBAR INTERACTION LOGIC
         function toggleSidebar() {
             const isHidden = sidebarMenu.classList.contains('-translate-x-full');
-            
             if (isHidden) {
-                // Open Sidebar
                 sidebarMenu.classList.remove('-translate-x-full');
                 sidebarOverlay.classList.remove('hidden');
                 setTimeout(() => sidebarOverlay.classList.add('opacity-100'), 10);
             } else {
-                // Close Sidebar
                 sidebarMenu.classList.add('-translate-x-full');
                 sidebarOverlay.classList.remove('opacity-100');
                 setTimeout(() => sidebarOverlay.classList.add('hidden'), 300);
-            }
-        }
-
-        // 🔍 OPTIONAL FEATURE: Filter display catalog by Type via Sidebar triggers
-        async function filterByType(type) {
-            toggleSidebar(); // Close navigation menu drawer
-            searchBar.value = ""; // Clear active search string state
-            
-            sectionTitle.innerText = type === 'movie' ? "🎬 EXPLORE MOVIES" : "📺 EXPLORE SERIES & ANIME";
-            
-            try {
-                loadingSpinner.style.display = 'flex';
-                movieGrid.innerHTML = '';
-                
-                const response = await fetch(API_BASE_URL);
-                const items = await response.json();
-                
-                loadingSpinner.style.display = 'none';
-                
-                // Filter records locally directly in browser memory arrays
-                const filteredItems = items.filter(item => item.type === type);
-                
-                if(filteredItems.length === 0) {
-                    movieGrid.innerHTML = `<p class="col-span-full text-center text-gray-400 my-8">No titles found in this category.</p>`;
-                    return;
-                }
-                
-                renderGrid(filteredItems);
-            } catch (err) {
-                loadingSpinner.style.display = 'none';
-                console.error("Filter calculation exception error:", err);
             }
         }
 
@@ -131,7 +93,9 @@
             items.forEach(item => {
                 const card = document.createElement('div');
                 card.className = "bg-[#111827] border border-gray-800 rounded-lg overflow-hidden group shadow-md hover:border-emerald-500 transition-all duration-300 cursor-pointer";
-                card.onclick = () => window.location.href = `movie.html?id=${item._id}`;
+                
+                // 🌟 PASSING BOTH ID AND TYPE TO DETAILS VIEW 
+                card.onclick = () => window.location.href = `movie.html?id=${item._id}&type=${item.type}`;
 
                 card.innerHTML = `
                     <div class="relative overflow-hidden aspect-[2/3]">
@@ -148,7 +112,7 @@
             });
         }
 
-        // General Catalog Extraction
+        // Fetch Landing Page Catalog (Active Uploaded Stored Items)
         async function fetchCatalog(url = API_BASE_URL) {
             try {
                 loadingSpinner.style.display = 'flex';
@@ -160,7 +124,7 @@
                 loadingSpinner.style.display = 'none';
 
                 if(items.length === 0) {
-                    movieGrid.innerHTML = `<p class="col-span-full text-center text-gray-400 my-8">No titles found.</p>`;
+                    movieGrid.innerHTML = `<p class="col-span-full text-center text-gray-400 my-8">No links uploaded yet.</p>`;
                     return;
                 }
 
@@ -171,7 +135,34 @@
             }
         }
 
-        // Live Real-Time Search Event Listener (With Debounce Fix)
+        // Filter display catalogue via Sidebar triggers
+        async function filterByType(type) {
+            toggleSidebar();
+            searchBar.value = "";
+            sectionTitle.innerText = type === 'movie' ? "🎬 EXPLORE MOVIES" : "📺 EXPLORE SERIES & ANIME";
+            
+            try {
+                loadingSpinner.style.display = 'flex';
+                movieGrid.innerHTML = '';
+                
+                const response = await fetch(API_BASE_URL);
+                const items = await response.json();
+                
+                loadingSpinner.style.display = 'none';
+                const filteredItems = items.filter(item => item.type === type);
+                
+                if(filteredItems.length === 0) {
+                    movieGrid.innerHTML = `<p class="col-span-full text-center text-gray-400 my-8">No items uploaded here yet.</p>`;
+                    return;
+                }
+                renderGrid(filteredItems);
+            } catch (err) {
+                loadingSpinner.style.display = 'none';
+                console.error("Filter evaluation error:", err);
+            }
+        }
+
+        // Live Real-Time Search Event Listener (Connected to TMDb backend endpoints)
         searchBar.addEventListener('input', (e) => {
             const query = e.target.value.trim();
             clearTimeout(searchTimer);
