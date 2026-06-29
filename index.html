@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MoviesMod Clone | Watch & Download</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        body { background-color: #0b0f19; color: #e2e8f0; }
+    </style>
+</head>
+<body>
+
+    <header class="border-b border-gray-800 bg-[#111827] sticky top-0 z-50 px-4 py-3 shadow-lg">
+        <div class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+            <h1 class="text-2xl font-black tracking-wider text-emerald-400 cursor-pointer" onclick="window.location.reload()">MOVIES<span class="text-white">MOD</span></h1>
+            
+            <div class="relative w-full sm:w-72">
+                <input id="search-bar" type="text" placeholder="Search movies, anime, series..." 
+                       class="w-full bg-[#1f2937] text-white pl-4 pr-10 py-2 rounded-lg border border-gray-700 focus:outline-none focus:border-emerald-400 text-sm">
+                <button class="absolute right-3 top-2.5 text-gray-400">🔍</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4 py-8">
+        <h2 id="section-title" class="text-xl font-bold border-l-4 border-emerald-500 pl-3 mb-6 tracking-wide">LATEST UPLOADS</h2>
+        
+        <div id="loading" class="flex justify-center my-12">
+            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-400"></div>
+        </div>
+
+        <div id="movie-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6"></div>
+    </main>
+
+    <script>
+        const API_BASE_URL = "https://guarded-caverns-13017-b15ead89228a.herokuapp.com/api/content";
+        const movieGrid = document.getElementById('movie-grid');
+        const loadingSpinner = document.getElementById('loading');
+        const searchBar = document.getElementById('search-bar');
+        const sectionTitle = document.getElementById('section-title');
+
+        // Function to Fetch and Render items onto the UI
+        async function fetchCatalog(url = API_BASE_URL) {
+            try {
+                loadingSpinner.style.display = 'flex';
+                movieGrid.innerHTML = '';
+                
+                const response = await fetch(url);
+                const items = await response.json();
+                
+                loadingSpinner.style.display = 'none';
+
+                if(items.length === 0) {
+                    movieGrid.innerHTML = `<p class="col-span-full text-center text-gray-400 my-8">No titles found.</p>`;
+                    return;
+                }
+
+                items.forEach(item => {
+                    const card = document.createElement('div');
+                    card.className = "bg-[#111827] border border-gray-800 rounded-lg overflow-hidden group shadow-md hover:border-emerald-500 transition-all duration-300 cursor-pointer";
+                    // When clicked, opens a dedicated layout view passing the item id
+                    card.onclick = () => window.location.href = `movie.html?id=${item._id}`;
+
+                    card.innerHTML = `
+                        <div class="relative overflow-hidden aspect-[2/3]">
+                            <img src="${item.coverImageUrl}" alt="${item.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 loading="lazy"">
+                            <span class="absolute top-2 left-2 bg-emerald-500 text-black text-[10px] font-bold uppercase px-2 py-0.5 rounded shadow">
+                                ${item.type}
+                            </span>
+                        </div>
+                        <div class="p-3">
+                            <h3 class="font-bold text-sm line-clamp-2 group-hover:text-emerald-400 transition-colors">${item.title}</h3>
+                        </div>
+                    `;
+                    movieGrid.appendChild(card);
+                });
+            } catch (err) {
+                loadingSpinner.style.display = 'none';
+                console.error("UI Render error:", err);
+            }
+        }
+
+        // Live Real-Time Search Event Listener
+        searchBar.addEventListener('input', (e) => {
+            const query = e.target.value.trim();
+            if(query.length > 1) {
+                sectionTitle.innerText = `SEARCH RESULTS FOR: "${query.toUpperCase()}"`;
+                fetchCatalog(`${API_BASE_URL}/search?q=${query}`);
+            } else if (query.length === 0) {
+                sectionTitle.innerText = "LATEST UPLOADS";
+                fetchCatalog();
+            }
+        });
+
+        // Initialize display on window load
+        window.onload = () => fetchCatalog();
+    </script>
+</body>
+</html>

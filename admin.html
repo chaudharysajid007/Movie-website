@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard | MoviesMod</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        body { background-color: #0b0f19; color: #e2e8f0; }
+        .form-card { background-color: #111827; border: 1px border-gray-800; }
+        input, select, textarea { background-color: #1f2937; border: 1px solid #374151; color: white; padding: 8px; border-radius: 6px; width: 100%; outline: none; }
+        input:focus { border-color: #10b981; }
+        label { display: block; font-size: 12px; font-weight: bold; color: #9ca3af; margin-bottom: 4px; text-transform: uppercase; }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+
+    <div class="max-w-5xl mx-auto">
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-2xl font-black text-emerald-400">ADMIN <span class="text-white">PANEL</span></h1>
+            <button onclick="window.location.href='index.html'" class="text-sm text-gray-400 hover:text-white">View Site ↗</button>
+        </div>
+
+        <section class="form-card p-6 rounded-xl shadow-2xl mb-12">
+            <h2 class="text-xl font-bold mb-6 border-b border-gray-800 pb-3">Upload New Content</h2>
+            
+            <form id="admin-form" class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label>Title</label>
+                        <input type="text" id="title" placeholder="e.g. Interstellar" required>
+                    </div>
+                    <div>
+                        <label>Type</label>
+                        <select id="type" onchange="toggleFormType()">
+                            <option value="movie">Movie</option>
+                            <option value="series">Series / Anime</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label>Description</label>
+                    <textarea id="description" rows="3" placeholder="Enter storyline..."></textarea>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label>Cover Image URL</label>
+                        <input type="text" id="cover" placeholder="https://...">
+                    </div>
+                    <div>
+                        <label>Screenshots (Comma Separated URLs)</label>
+                        <input type="text" id="screenshots" placeholder="url1, url2, url3">
+                    </div>
+                </div>
+
+                <div id="movie-section" class="bg-gray-900/50 p-4 rounded-lg">
+                    <h3 class="font-bold text-sm text-emerald-400 mb-4 uppercase">Movie Download Links</h3>
+                    <div id="movie-links-container" class="space-y-3"></div>
+                    <button type="button" onclick="addMovieLinkField()" class="mt-3 text-xs bg-emerald-600 px-3 py-1 rounded font-bold text-black">+ Add Resolution</button>
+                </div>
+
+                <div id="series-section" class="hidden bg-gray-900/50 p-4 rounded-lg space-y-4">
+                    <h3 class="font-bold text-sm text-emerald-400 mb-2 uppercase">Series/Anime Seasons Breakdown</h3>
+                    <div id="seasons-container" class="space-y-6"></div>
+                    <button type="button" onclick="addSeason()" class="w-full py-2 border-2 border-dashed border-gray-700 rounded-lg text-gray-500 font-bold hover:border-emerald-500 hover:text-emerald-500">+ Add Season</button>
+                </div>
+
+                <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-black py-3 rounded-lg transition-colors shadow-lg">🚀 PUBLISH TO WEBSITE</button>
+            </form>
+        </section>
+
+        <section class="form-card p-6 rounded-xl">
+            <h2 class="text-xl font-bold mb-6">Manage Existing Content</h2>
+            <div id="admin-list" class="space-y-3"></div>
+        </section>
+    </div>
+
+    <script>
+        const API_URL = "https://guarded-caverns-13017-b15ead89228a.herokuapp.com/api/content";
+        const form = document.getElementById('admin-form');
+        let seasonCount = 0;
+
+        function toggleFormType() {
+            const type = document.getElementById('type').value;
+            document.getElementById('movie-section').classList.toggle('hidden', type !== 'movie');
+            document.getElementById('series-section').classList.toggle('hidden', type !== 'series');
+        }
+
+        // --- MOVIE LINK LOGIC ---
+        function addMovieLinkField() {
+            const container = document.getElementById('movie-links-container');
+            const div = document.createElement('div');
+            div.className = "flex gap-2 movie-link-item";
+            div.innerHTML = `
+                <select class="w-32 res-val"><option>480p</option><option>720p</option><option>1080p</option></select>
+                <input type="text" class="url-val" placeholder="Download URL">
+            `;
+            container.appendChild(div);
+        }
+
+        // --- SERIES NESTED LOGIC ---
+        function addSeason() {
+            seasonCount++;
+            const container = document.getElementById('seasons-container');
+            const sDiv = document.createElement('div');
+            sDiv.className = "bg-black/30 p-4 rounded-lg border border-gray-800 season-item";
+            sDiv.innerHTML = `
+                <div class="flex items-center gap-4 mb-4">
+                    <label class="mb-0">Season Number</label>
+                    <input type="number" class="w-20 s-num" value="${seasonCount}">
+                </div>
+                <div class="res-container space-y-4"></div>
+                <button type="button" onclick="addResolution(this)" class="mt-4 text-[10px] bg-blue-600 px-2 py-1 rounded text-white">+ Add Resolution Block</button>
+            `;
+            container.appendChild(sDiv);
+        }
+
+        function addResolution(btn) {
+            const container = btn.previousElementSibling;
+            const rDiv = document.createElement('div');
+            rDiv.className = "bg-gray-800/50 p-3 rounded res-item border-l-2 border-emerald-500";
+            rDiv.innerHTML = `
+                <div class="flex gap-2 mb-2">
+                    <select class="w-24 r-val"><option>480p</option><option>720p</option><option>1080p</option></select>
+                    <input type="text" class="b-link" placeholder="Batch Link (Optional)">
+                </div>
+                <div class="ep-container grid grid-cols-2 gap-2"></div>
+                <button type="button" onclick="addEpisode(this)" class="mt-2 text-[10px] text-emerald-400 font-bold uppercase tracking-widest">+ Add Episode</button>
+            `;
+            container.appendChild(rDiv);
+        }
+
+        function addEpisode(btn) {
+            const container = btn.previousElementSibling;
+            const eDiv = document.createElement('div');
+            eDiv.className = "flex gap-1 ep-item";
+            eDiv.innerHTML = `
+                <input type="number" class="w-16 e-num" placeholder="Ep #">
+                <input type="text" class="e-url" placeholder="Ep URL">
+            `;
+            container.appendChild(eDiv);
+        }
+
+        // --- SUBMIT LOGIC ---
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            const type = document.getElementById('type').value;
+            
+            const payload = {
+                title: document.getElementById('title').value,
+                type: type,
+                description: document.getElementById('description').value,
+                coverImageUrl: document.getElementById('cover').value,
+                screenshots: document.getElementById('screenshots').value.split(',').map(s => s.trim()),
+                movieLinks: [],
+                seasons: []
+            };
+
+            if(type === 'movie') {
+                document.querySelectorAll('.movie-link-item').forEach(el => {
+                    payload.movieLinks.push({ resolution: el.querySelector('.res-val').value, downloadUrl: el.querySelector('.url-val').value });
+                });
+            } else {
+                document.querySelectorAll('.season-item').forEach(sEl => {
+                    const season = { seasonNumber: sEl.querySelector('.s-num').value, resolutions: [] };
+                    sEl.querySelectorAll('.res-item').forEach(rEl => {
+                        const res = { resolution: rEl.querySelector('.r-val').value, batchLink: rEl.querySelector('.b-link').value, episodes: [] };
+                        rEl.querySelectorAll('.ep-item').forEach(eEl => {
+                            res.episodes.push({ episodeNumber: eEl.querySelector('.e-num').value, downloadUrl: eEl.querySelector('.e-url').value });
+                        });
+                        season.resolutions.push(res);
+                    });
+                    payload.seasons.push(season);
+                });
+            }
+
+            const res = await fetch(`${API_URL}/add`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if(res.ok) { alert('✅ Published Successfully!'); location.reload(); }
+        };
+
+        // --- LIST / DELETE LOGIC ---
+        async function loadAdminList() {
+            const res = await fetch(API_URL);
+            const data = await res.json();
+            const list = document.getElementById('admin-list');
+            data.forEach(item => {
+                list.innerHTML += `
+                    <div class="flex justify-between items-center bg-gray-900 p-3 rounded border border-gray-800">
+                        <span class="text-sm font-bold">${item.title} (${item.type})</span>
+                        <button onclick="deleteItem('${item._id}')" class="bg-red-900/50 text-red-500 text-xs px-3 py-1 rounded">Delete</button>
+                    </div>
+                `;
+            });
+        }
+
+        async function deleteItem(id) {
+            if(confirm('Delete this entry permanently?')) {
+                await fetch(`${API_URL}/delete/${id}`, { method: 'DELETE' });
+                location.reload();
+            }
+        }
+
+        window.onload = () => { addMovieLinkField(); loadAdminList(); };
+    </script>
+</body>
+</html>

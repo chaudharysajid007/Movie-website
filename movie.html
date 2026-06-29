@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download Media - MoviesMod</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        body { background-color: #0b0f19; color: #e2e8f0; }
+    </style>
+</head>
+<body>
+
+    <header class="border-b border-gray-800 bg-[#111827] px-4 py-3 shadow-lg mb-6">
+        <div class="max-w-4xl mx-auto">
+            <h1 class="text-xl font-black text-emerald-400 cursor-pointer" onclick="window.location.href='index.html'">⬅ BACK TO HOME</h1>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto px-4 pb-12">
+        <div id="loading" class="flex justify-center my-12">
+            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-400"></div>
+        </div>
+
+        <div id="content-container" class="hidden">
+            <h2 id="media-title" class="text-2xl sm:text-3xl font-extrabold text-white mb-4"></h2>
+            
+            <div class="flex flex-col md:flex-row gap-6 mb-8">
+                <img id="media-cover" class="w-full md:w-64 aspect-[2/3] object-cover rounded-lg shadow-xl border border-gray-800" src="" alt="">
+                
+                <div class="flex-1">
+                    <h3 class="text-sm font-bold text-emerald-400 tracking-wider uppercase mb-1">Synopsis / Storyline</h3>
+                    <p id="media-desc" class="text-gray-400 text-sm leading-relaxed mb-6"></p>
+                    
+                    <h3 class="text-sm font-bold text-emerald-400 tracking-wider uppercase mb-2">Screenshots</h3>
+                    <div id="screenshots-box" class="grid grid-cols-2 gap-2"></div>
+                </div>
+            </div>
+
+            <div class="bg-[#111827] border border-gray-800 rounded-xl p-4 sm:p-6 shadow-inner">
+                <h3 class="text-lg font-bold text-white mb-4 border-b border-gray-800 pb-2 flex items-center gap-2">
+                    📥 Download Links Generation
+                </h3>
+                <div id="download-zone"></div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Extract content ID variable directly from URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const contentId = urlParams.get('id');
+        const FETCH_URL = `https://guarded-caverns-13017-b15ead89228a.herokuapp.com/api/content/${contentId}`;
+
+        async function loadPageDetails() {
+            if(!contentId) return;
+            try {
+                const response = await fetch(FETCH_URL);
+                const data = await response.json();
+                
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('content-container').classList.remove('hidden');
+
+                // Populate Text Elements
+                document.getElementById('media-title').innerText = data.title;
+                document.getElementById('media-desc').innerText = data.description;
+                document.getElementById('media-cover').src = data.coverImageUrl;
+
+                // Render Screenshots
+                const screenBox = document.getElementById('screenshots-box');
+                data.screenshots.forEach(url => {
+                    screenBox.innerHTML += `<img src="${url}" class="rounded border border-gray-800 hover:scale-102 transition-transform shadow w-full aspect-video object-cover">`;
+                });
+
+                // Generate Custom Target Link Tree UI
+                const downloadZone = document.getElementById('download-zone');
+                
+                if (data.type === 'movie') {
+                    // FLAT MOVIE MOUNT VIEW
+                    let movieHTML = `<div class="flex flex-col gap-3">`;
+                    data.movieLinks.forEach(link => {
+                        movieHTML += `
+                            <a href="${link.downloadUrl}" target="_blank" class="flex items-center justify-between bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white font-bold px-4 py-3 rounded-lg shadow transition-all duration-200">
+                                <span>Download Movie Direct Link</span>
+                                <span class="bg-black/30 px-3 py-1 rounded text-xs tracking-wider">${link.resolution}</span>
+                            </a>`;
+                    });
+                    movieHTML += `</div>`;
+                    downloadZone.innerHTML = movieHTML;
+
+                } else {
+                    // NESTED SERIES / ANIME ACCORDION MOUNT VIEW
+                    let seriesHTML = `<div class="flex flex-col gap-4">`;
+                    
+                    data.seasons.forEach((season, sIdx) => {
+                        seriesHTML += `
+                            <div class="border border-gray-800 rounded-lg overflow-hidden bg-[#1f2937]/50">
+                                <button onclick="toggleAccordion('season-${sIdx}')" class="w-full text-left bg-[#1f2937] hover:bg-gray-700 px-4 py-3 font-bold text-emerald-400 flex justify-between items-center transition-colors">
+                                    <span>💥 Season ${season.seasonNumber} Breakdown</span>
+                                    <span>🔻</span>
+                                </button>
+                                
+                                <div id="season-${sIdx}" class="hidden p-4 flex flex-col gap-4 border-t border-gray-800 bg-[#0f172a]">`;
+                        
+                        season.resolutions.forEach(res => {
+                            seriesHTML += `
+                                <div class="border-l-2 border-emerald-500 pl-3">
+                                    <h4 class="text-sm font-bold text-white mb-2 uppercase tracking-wide bg-gray-800 inline-block px-2 py-0.5 rounded text-xs">${res.resolution} Quality</h4>
+                                    <div class="flex flex-wrap gap-2 mb-2">`;
+                                    
+                            // Map out episode link buttons
+                            res.episodes.forEach(ep => {
+                                seriesHTML += `
+                                    <a href="${ep.downloadUrl}" target="_blank" class="bg-gray-800 hover:bg-emerald-600 hover:text-black border border-gray-700 text-xs px-3 py-1.5 rounded transition-all">
+                                        EP ${ep.episodeNumber}
+                                    </a>`;
+                            });
+                            
+                            seriesHTML += `</div>`;
+                            
+                            // Check if a Batch Download folder option exists
+                            if (res.batchLink) {
+                                seriesHTML += `
+                                    <a href="${res.batchLink}" target="_blank" class="inline-flex items-center text-xs text-amber-400 hover:underline font-semibold gap-1">
+                                        📦 Download Complete Season Batch (${res.resolution}) ⚡
+                                    </a>`;
+                            }
+                            
+                            seriesHTML += `</div><hr class="border-gray-900 my-1">`;
+                        });
+                        
+                        seriesHTML += `</div></div>`;
+                    });
+                    
+                    seriesHTML += `</div>`;
+                    downloadZone.innerHTML = seriesHTML;
+                }
+
+            } catch (err) {
+                console.error("Single item load failed:", err);
+            }
+        }
+
+        // Lightweight local view toggle controller
+        function toggleAccordion(id) {
+            const block = document.getElementById(id);
+            block.classList.toggle('hidden');
+        }
+
+        window.onload = () => loadPageDetails();
+    </script>
+</body>
+</html>
