@@ -78,8 +78,19 @@ router.post('/add', async (req, res) => {
   }
 });
 
-// 5. EDIT: Modify specific titles or swap nested links
+// 5. EDIT: Modify specific titles or swap nested links (🔒 SECURED WITH PASSWORD)
 router.put('/edit/:id', async (req, res) => {
+  // 🔒 1. Extract password from incoming network headers
+  const clientPassword = req.headers['x-admin-password'];
+  
+  // 🔒 2. Grab the true password hidden inside Heroku's configuration vault
+  const secureMasterPassword = process.env.ADMIN_PASSWORD;
+
+  // 🔒 3. Compare them. If they don't match, block the modification!
+  if (!clientPassword || clientPassword !== secureMasterPassword) {
+    return res.status(401).json({ message: "Unauthorized: Invalid Admin Password" });
+  }
+
   try {
     const updatedItem = await Content.findByIdAndUpdate(
       req.params.id, 
@@ -93,8 +104,19 @@ router.put('/edit/:id', async (req, res) => {
   }
 });
 
-// 6. DELETE: Wipe out entry completely
+// 6. DELETE: Wipe out entry completely (🔒 SECURED WITH PASSWORD)
 router.delete('/delete/:id', async (req, res) => {
+  // 🔒 1. Extract password from incoming network headers
+  const clientPassword = req.headers['x-admin-password'];
+  
+  // 🔒 2. Grab the true password hidden inside Heroku's configuration vault
+  const secureMasterPassword = process.env.ADMIN_PASSWORD;
+
+  // 🔒 3. Compare them. If they don't match, block the deletion!
+  if (!clientPassword || clientPassword !== secureMasterPassword) {
+    return res.status(401).json({ message: "Unauthorized: Invalid Admin Password" });
+  }
+
   try {
     const item = await Content.findByIdAndDelete(req.params.id);
     if (!item) return res.status(404).json({ message: 'Content not found' });
@@ -115,6 +137,5 @@ router.post('/verify-password', (req, res) => {
     return res.status(401).json({ success: false, message: "Invalid Password" });
   }
 });
-
 
 module.exports = router;
