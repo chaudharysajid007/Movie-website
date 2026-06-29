@@ -1,52 +1,155 @@
 const express = require('express');
 const router = express.Router();
 const Content = require('../models/Content');
+const { fetchFromTMDb } = require('../utils/tmdb');
+
+// Helper to easily check Admin Passwords across admin routes
+const verifyAdminSession = (req, res) => {
+  const clientPassword = req.headers['x-admin-password'];
+  const secureMasterPassword = process.env.ADMIN_PASSWORD;
+  return clientPassword && clientPassword === secureMasterPassword;
+};
 
 // ==========================================
-// USER PANEL ROUTES (Public Access)
+// USER PANEL ROUTES (Public Access via TMDb)
 // ==========================================
 
-// 1. Get all entries (Homepage catalog)
+// 1. Homepage Catalog: Fetches what items you currently have saved with links
 router.get('/', async (req, res) => {
   try {
-    const items = await Content.find().sort({ createdAt: -1 });
-    res.json(items);
+    const localItems = await Content.find().sort({ createdAt: -1 });
+    
+    // Convert saved database entries into rich TMDb profiles for the homepage
+    const richItems = await Promise.all(localItems.map(async (item) => {
+      const endpoint = item.type === 'series' ? `/tv/${item.tmdbId}` : `/movie/${item.tmdbId}`;
+      const meta = await fetchFromTMDb(endpoint);
+      if (!meta) return null;
+      
+      return {
+        _id: item.tmdbId,
+        title: meta.title || meta.name,
+        type: item.type,
+        coverImageUrl: `https://image.tmdb.org/t/p/w500${meta.poster_path}`
+      };
+    }));
+
+    // Filter out any broken queries
+    res.json(richItems.filter(i => i !== null));
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-// 2. Real-time Search Route (Instant letter-by-letter partial filtering)
+// 2. Real-time Search Route (Queries TMDb live instead of local Mongo indexes)
 router.get('/search', async (req, res) => {
-  const { q } = req.query; // e.g., /api/content/search?q=fro
+  const { q } = req.query;
+  if (!q) return res.json([]);
+
   try {
-    // If the search bar is cleared, return an empty array or all items
-    if (!q) {
-      return res.json([]);
+    const movieData = await fetchFromTMDb('/search/movie', `&query=${encodeURIComponent(q)}`);
+    const tvData = await fetchFromTMDb('/search/tv', `&query=${encodeURIComponent(q)}`);
+
+    const results = [];
+
+    if (movieData && movieData.results) {
+      movieData.results.forEach(m => {
+        if (!m.poster_path) return;
+        results.push({
+          _id: m.id.toString(),
+          title: m.title,
+          type: 'movie',
+          coverImageUrl: `https://image.tmdb.org/t/p/w500${m.poster_path}`
+        });
+      });
     }
 
-    // $regex looks for the typed string anywhere inside the title
-    // 'i' makes it case-insensitive so typing 'f' or 'F' works identically
-    const results = await Content.find({
-      title: { $regex: q, $options: 'i' }
-    });
-    
+    if (tvData && tvData.results) {
+      tvData.results.forEach(t => {
+        if (!t.poster_path) return;
+        results.push({
+          _id: t.id.toString(),
+          title: t.name,
+          type: 'series',
+          coverImageUrl: `https://image.tmdb.org/t/p/w500${t.poster_path}`
+        });
+      });
+    }
+
     res.json(results);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-
-// 3. Get single item details (The Download Page layout data)
+// 3. Get Single Item Details (Combines global TMDb metadata with your local links)
 router.get('/:id', async (req, res) => {
+  const tmdbId = req.params.id;
+  const { type } = req.query; // Expects ?type=movie or ?type=series from front-end URL
+  
   try {
-    const item = await Content.findById(req.params.id);
-    if (!item) return res.status(404).json({ message: 'Content not found' });
-    res.json(item);
+    const endpoint = type === 'series' ? `/tv/${tmdbId}` : `/movie/${tmdbId}`;
+    const metadata = await fetchFromTMDb(endpoint, "&append_to_response=images");
+
+    if (!metadata) return res.status(404).json({ message: 'Title details not found globally' });
+
+    // Look up if we have download links stored inside MongoDB for this specific ID
+    const localRecord = await Content.findOne({ tmdbId: tmdbId.toString() });
+
+    let backdrops = [];
+    if (metadata.images && metadata.images.backdrops) {
+      backdrops = metadata.images.backdrops.slice(0, 4).map(b => `https://image.tmdb.org/t/p/w780${b.file_path}`);
+    }
+
+    res.json({
+      _id: tmdbId,
+      title: metadata.title || metadata.name,
+      description: metadata.overview,
+      coverImageUrl: `https://image.tmdb.org/t/p/w500${metadata.poster_path}`,
+      screenshots: backdrops,
+      type: type === 'series' ? 'series' : 'movie',
+      movieLinks: localRecord ? localRecord.movieLinks : [],
+      seasons: localRecord ? localRecord.seasons : [],
+      hasLinks: !!localRecord // Easy flag to tell frontend if links are available
+    });
   } catch (err) {
-    console.error("🔥 DATABASE CRASH ERROR:", err);
-    res.status(400).json({ message: err.message, error: err });
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// 📬 NEW: AUTOMATED TELEGRAM CONTENT REQUEST NOTIFICATION ROUTE
+router.post('/request/:id', async (req, res) => {
+  const tmdbId = req.params.id;
+  const { title, type } = req.body;
+
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+
+  if (!botToken || !chatId) {
+    return res.status(500).json({ message: "Notification server variables misconfigured" });
+  }
+
+  // Compose an elegant alert message for your phone
+  const alertMessage = `🚨 *New Sajidflix Content Request!*\n\n` +
+                       `🎬 *Title:* ${title}\n` +
+                       `🏷️ *Type:* ${type.toUpperCase()}\n` +
+                       `🆔 *TMDb ID:* \`${tmdbId}\`\n\n` +
+                       `👉 _Go to your Admin Panel, create an entry with this TMDb ID and attach your download links!_`;
+
+  try {
+    const telegramUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    await fetch(telegramUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: alertMessage,
+        parse_mode: 'Markdown'
+      })
+    });
+
+    res.json({ success: true, message: "Request successfully sent to admin!" });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to broadcast notification", error: err.message });
   }
 });
 
@@ -54,26 +157,15 @@ router.get('/:id', async (req, res) => {
 // ADMIN PANEL ROUTES (Management Operations)
 // ==========================================
 
-// 4. UPLOAD: Create new movie, series, or anime (🔒 SECURED WITH PASSWORD)
+// 4. UPLOAD LINKS: Save downloadable links matching a tmdbId (🔒 SECURED)
 router.post('/add', async (req, res) => {
-  // 🔒 1. Extract password from incoming network headers
-  const clientPassword = req.headers['x-admin-password'];
-  
-  // 🔒 2. Grab the true password hidden inside Heroku's configuration vault
-  const secureMasterPassword = process.env.ADMIN_PASSWORD;
-
-  // 🔒 3. Compare them. If they don't match, block the user immediately!
-  if (!clientPassword || clientPassword !== secureMasterPassword) {
+  if (!verifyAdminSession(req, res)) {
     return res.status(401).json({ message: "Unauthorized: Invalid Admin Password" });
   }
 
-  // 4. If password matches, proceed with building and saving the movie structure
   const item = new Content({
-    title: req.body.title,
+    tmdbId: req.body.tmdbId, // Links directly to TMDb 
     type: req.body.type,
-    description: req.body.description,
-    coverImageUrl: req.body.coverImageUrl,
-    screenshots: req.body.screenshots,
     movieLinks: req.body.movieLinks, 
     seasons: req.body.seasons        
   });
@@ -86,22 +178,16 @@ router.post('/add', async (req, res) => {
   }
 });
 
-// 5. EDIT: Modify specific titles or swap nested links (🔒 SECURED WITH PASSWORD)
+// 5. EDIT LINKS: Swap nested resolution download links (🔒 SECURED)
 router.put('/edit/:id', async (req, res) => {
-  // 🔒 1. Extract password from incoming network headers
-  const clientPassword = req.headers['x-admin-password'];
-  
-  // 🔒 2. Grab the true password hidden inside Heroku's configuration vault
-  const secureMasterPassword = process.env.ADMIN_PASSWORD;
-
-  // 🔒 3. Compare them. If they don't match, block the modification!
-  if (!clientPassword || clientPassword !== secureMasterPassword) {
+  if (!verifyAdminSession(req, res)) {
     return res.status(401).json({ message: "Unauthorized: Invalid Admin Password" });
   }
 
   try {
-    const updatedItem = await Content.findByIdAndUpdate(
-      req.params.id, 
+    // Find by tmdbId instead of internal MongoDB ObjectIds
+    const updatedItem = await Content.findOneAndUpdate(
+      { tmdbId: req.params.id }, 
       req.body, 
       { new: true } 
     );
@@ -112,29 +198,22 @@ router.put('/edit/:id', async (req, res) => {
   }
 });
 
-// 6. DELETE: Wipe out entry completely (🔒 SECURED WITH PASSWORD)
+// 6. DELETE LINKS: Wipe out download availability (🔒 SECURED)
 router.delete('/delete/:id', async (req, res) => {
-  // 🔒 1. Extract password from incoming network headers
-  const clientPassword = req.headers['x-admin-password'];
-  
-  // 🔒 2. Grab the true password hidden inside Heroku's configuration vault
-  const secureMasterPassword = process.env.ADMIN_PASSWORD;
-
-  // 🔒 3. Compare them. If they don't match, block the deletion!
-  if (!clientPassword || clientPassword !== secureMasterPassword) {
+  if (!verifyAdminSession(req, res)) {
     return res.status(401).json({ message: "Unauthorized: Invalid Admin Password" });
   }
 
   try {
-    const item = await Content.findByIdAndDelete(req.params.id);
+    const item = await Content.findOneAndDelete({ tmdbId: req.params.id });
     if (!item) return res.status(404).json({ message: 'Content not found' });
-    res.json({ message: 'Content dropped successfully from production directory' });
+    res.json({ message: 'Download configuration dropped successfully' });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-// 🔒 LOGIN ROUTE: Validates the password against Heroku Config Vars
+// 🔒 LOGIN ROUTE: Validates admin password vault access
 router.post('/verify-password', (req, res) => {
   const { password } = req.body;
   const secureMasterPassword = process.env.ADMIN_PASSWORD;
