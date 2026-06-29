@@ -7,7 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <style>
         body { background-color: #0b0f19; color: #e2e8f0; }
-        .form-card { background-color: #111827; border: 1px border-gray-800; }
+        .form-card { background-color: #111827; border: 1px solid #1f2937; }
         input, select, textarea { background-color: #1f2937; border: 1px solid #374151; color: white; padding: 8px; border-radius: 6px; width: 100%; outline: none; }
         input:focus { border-color: #10b981; }
         label { display: block; font-size: 12px; font-weight: bold; color: #9ca3af; margin-bottom: 4px; text-transform: uppercase; }
@@ -20,92 +20,98 @@
             <h2 class="text-xl font-black text-emerald-400 mb-2">🔒 ADMIN VERIFICATION</h2>
             <p class="text-xs text-gray-400 mb-4">Authorized Personnel Only</p>
             <input type="password" id="admin-secret-key" placeholder="Enter Admin Password" class="mb-4 text-center">
-            <button type="button" onclick="verifyAdminKey()" class="w-full bg-emerald-500 text-black font-bold py-2 rounded-lg">UNLOCK PANEL</button>
+            <button type="button" onclick="verifyAdminKey()" class="w-full bg-emerald-500 text-black font-bold py-2 rounded-lg cursor-pointer">UNLOCK PANEL</button>
         </div>
     </div>
 
     <div id="admin-content" class="hidden">
-    
+        <div class="max-w-5xl mx-auto">
+            <div class="flex justify-between items-center mb-8">
+                <h1 class="text-2xl font-black text-emerald-400">ADMIN <span class="text-white">PANEL</span></h1>
+                <button onclick="window.location.href='index.html'" class="text-sm text-gray-400 hover:text-white cursor-pointer">View Site ↗</button>
+            </div>
 
-    <div class="max-w-5xl mx-auto">
-        <div class="flex justify-between items-center mb-8">
-            <h1 class="text-2xl font-black text-emerald-400">ADMIN <span class="text-white">PANEL</span></h1>
-            <button onclick="window.location.href='index.html'" class="text-sm text-gray-400 hover:text-white">View Site ↗</button>
+            <section class="form-card p-6 rounded-xl shadow-2xl mb-12">
+                <h2 class="text-xl font-bold mb-6 border-b border-gray-800 pb-3">Upload New Content</h2>
+                
+                <form id="admin-form" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label>Title</label>
+                            <input type="text" id="title" placeholder="e.g. Interstellar" required>
+                        </div>
+                        <div>
+                            <label>Type</label>
+                            <select id="type" onchange="toggleFormType()">
+                                <option value="movie">Movie</option>
+                                <option value="series">Series / Anime</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label>Description</label>
+                        <textarea id="description" rows="3" placeholder="Enter storyline..."></textarea>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label>Cover Image URL</label>
+                            <input type="text" id="cover" placeholder="https://...">
+                        </div>
+                        <div>
+                            <label>Screenshots (Comma Separated URLs)</label>
+                            <input type="text" id="screenshots" placeholder="url1, url2, url3">
+                        </div>
+                    </div>
+
+                    <div id="movie-section" class="bg-gray-900/50 p-4 rounded-lg">
+                        <h3 class="font-bold text-sm text-emerald-400 mb-4 uppercase">Movie Download Links</h3>
+                        <div id="movie-links-container" class="space-y-3"></div>
+                        <button type="button" onclick="addMovieLinkField()" class="mt-3 text-xs bg-emerald-600 px-3 py-1 rounded font-bold text-black cursor-pointer">+ Add Resolution</button>
+                    </div>
+
+                    <div id="series-section" class="hidden bg-gray-900/50 p-4 rounded-lg space-y-4">
+                        <h3 class="font-bold text-sm text-emerald-400 mb-2 uppercase">Series/Anime Seasons Breakdown</h3>
+                        <div id="seasons-container" class="space-y-6"></div>
+                        <button type="button" onclick="addSeason()" class="w-full py-2 border-2 border-dashed border-gray-700 rounded-lg text-gray-500 font-bold hover:border-emerald-500 hover:text-emerald-500 cursor-pointer">+ Add Season</button>
+                    </div>
+
+                    <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-black py-3 rounded-lg transition-colors shadow-lg cursor-pointer">🚀 PUBLISH TO WEBSITE</button>
+                </form>
+            </section>
+
+            <section class="form-card p-6 rounded-xl">
+                <h2 class="text-xl font-bold mb-6">Manage Existing Content</h2>
+                <div id="admin-list" class="space-y-3"></div>
+            </section>
         </div>
-
-        <section class="form-card p-6 rounded-xl shadow-2xl mb-12">
-            <h2 class="text-xl font-bold mb-6 border-b border-gray-800 pb-3">Upload New Content</h2>
-            
-            <form id="admin-form" class="space-y-6">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label>Title</label>
-                        <input type="text" id="title" placeholder="e.g. Interstellar" required>
-                    </div>
-                    <div>
-                        <label>Type</label>
-                        <select id="type" onchange="toggleFormType()">
-                            <option value="movie">Movie</option>
-                            <option value="series">Series / Anime</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div>
-                    <label>Description</label>
-                    <textarea id="description" rows="3" placeholder="Enter storyline..."></textarea>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label>Cover Image URL</label>
-                        <input type="text" id="cover" placeholder="https://...">
-                    </div>
-                    <div>
-                        <label>Screenshots (Comma Separated URLs)</label>
-                        <input type="text" id="screenshots" placeholder="url1, url2, url3">
-                    </div>
-                </div>
-
-                <div id="movie-section" class="bg-gray-900/50 p-4 rounded-lg">
-                    <h3 class="font-bold text-sm text-emerald-400 mb-4 uppercase">Movie Download Links</h3>
-                    <div id="movie-links-container" class="space-y-3"></div>
-                    <button type="button" onclick="addMovieLinkField()" class="mt-3 text-xs bg-emerald-600 px-3 py-1 rounded font-bold text-black">+ Add Resolution</button>
-                </div>
-
-                <div id="series-section" class="hidden bg-gray-900/50 p-4 rounded-lg space-y-4">
-                    <h3 class="font-bold text-sm text-emerald-400 mb-2 uppercase">Series/Anime Seasons Breakdown</h3>
-                    <div id="seasons-container" class="space-y-6"></div>
-                    <button type="button" onclick="addSeason()" class="w-full py-2 border-2 border-dashed border-gray-700 rounded-lg text-gray-500 font-bold hover:border-emerald-500 hover:text-emerald-500">+ Add Season</button>
-                </div>
-
-                <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-black py-3 rounded-lg transition-colors shadow-lg">🚀 PUBLISH TO WEBSITE</button>
-            </form>
-        </section>
-
-        <section class="form-card p-6 rounded-xl">
-            <h2 class="text-xl font-bold mb-6">Manage Existing Content</h2>
-            <div id="admin-list" class="space-y-3"></div>
-        </section>
     </div>
 
     <script>
-    function verifyAdminKey() {
-    const inputKey = document.getElementById('admin-secret-key').value;
-    const MASTER_PASSWORD = "sajid_secret_movies_2026"; 
-
-    if (inputKey === MASTER_PASSWORD) {
-        document.getElementById('admin-lockbox').remove();
-        document.getElementById('admin-content').classList.remove('hidden');
-    } else {
-        alert("❌ ACCESS DENIED: Invalid Credentials.");
-        window.location.href = "index.html";
-    }
-}
-
         const API_URL = "https://guarded-caverns-13017-b15ead89228a.herokuapp.com/api/content";
         const form = document.getElementById('admin-form');
         let seasonCount = 0;
+
+        // 🔒 Unlocks UI and ONLY then loads items from your API
+        function verifyAdminKey() {
+            const inputKey = document.getElementById('admin-secret-key').value;
+
+            if (!inputKey) {
+                alert("Please enter a password!");
+                return;
+            }
+
+            // Save typed value to session memory
+            sessionStorage.setItem('adminKey', inputKey);
+
+            // Open up the panel view structure
+            document.getElementById('admin-lockbox').remove();
+            document.getElementById('admin-content').classList.remove('hidden');
+
+            // NOW it is safe to load items from the database!
+            loadAdminList();
+        }
 
         function toggleFormType() {
             const type = document.getElementById('type').value;
@@ -203,37 +209,60 @@
 
             const res = await fetch(`${API_URL}/add`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-Admin-Password': sessionStorage.getItem('adminKey') 
+                },
                 body: JSON.stringify(payload)
             });
 
-            if(res.ok) { alert('✅ Published Successfully!'); location.reload(); }
+            if(res.ok) { 
+                alert('✅ Published Successfully!'); 
+                location.reload(); 
+            } else {
+                const errData = await res.json();
+                alert(`❌ ERROR: ${errData.message}`);
+            }
         };
 
         // --- LIST / DELETE LOGIC ---
         async function loadAdminList() {
-            const res = await fetch(API_URL);
-            const data = await res.json();
-            const list = document.getElementById('admin-list');
-            data.forEach(item => {
-                list.innerHTML += `
-                    <div class="flex justify-between items-center bg-gray-900 p-3 rounded border border-gray-800">
-                        <span class="text-sm font-bold">${item.title} (${item.type})</span>
-                        <button onclick="deleteItem('${item._id}')" class="bg-red-900/50 text-red-500 text-xs px-3 py-1 rounded">Delete</button>
-                    </div>
-                `;
-            });
+            try {
+                const res = await fetch(API_URL);
+                const data = await res.json();
+                const list = document.getElementById('admin-list');
+                list.innerHTML = ""; // Clear list
+                data.forEach(item => {
+                    list.innerHTML += `
+                        <div class="flex justify-between items-center bg-gray-900 p-3 rounded border border-gray-800">
+                            <span class="text-sm font-bold">${item.title} (${item.type})</span>
+                            <button onclick="deleteItem('${item._id}')" class="bg-red-900/50 text-red-500 text-xs px-3 py-1 rounded cursor-pointer">Delete</button>
+                        </div>
+                    `;
+                });
+            } catch (err) {
+                console.error("Error loading panel lists:", err);
+            }
         }
 
         async function deleteItem(id) {
             if(confirm('Delete this entry permanently?')) {
-                await fetch(`${API_URL}/delete/${id}`, { method: 'DELETE' });
-                location.reload();
+                const res = await fetch(`${API_URL}/delete/${id}`, { 
+                    method: 'DELETE',
+                    headers: {
+                        'X-Admin-Password': sessionStorage.getItem('adminKey')
+                    }
+                });
+                if(res.ok) {
+                    location.reload();
+                } else {
+                    alert("Failed to delete item.");
+                }
             }
         }
 
-        window.onload = () => { addMovieLinkField(); loadAdminList(); };
+        // Only render layout forms on load, keep list calls away until verification!
+        window.onload = () => { addMovieLinkField(); };
     </script>
-        </div>
 </body>
 </html>
