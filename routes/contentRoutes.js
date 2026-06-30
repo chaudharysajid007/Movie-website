@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Content = require('../models/Content');
 const { fetchFromTMDb } = require('../utils/tmdb');
+const crypto = require('crypto'); // Built-in Node crypto module
 
 // Helper to easily check Admin Passwords across admin routes
 const verifyAdminSession = (req, res) => {
@@ -10,26 +11,48 @@ const verifyAdminSession = (req, res) => {
   return clientPassword && clientPassword === secureMasterPassword;
 };
 
+/**
+ * 🔒 HELPER: Encrypt Real URLs into Temporary 11-Hour Tokens
+ * Encrypts Driveseed URLs bound tightly to the visitor's IP address.
+ */
+function encryptUrl(realUrl, userIp) {
+  if (!realUrl) return "";
+  try {
+    const secret = process.env.LINK_SECRET || "sajidflix_ultra_secure_key_123";
+    const expiresAt = Date.now() + (11 * 60 * 60 * 1000); // 🕒 11 Hours from right now
+    
+    const payload = JSON.stringify({ url: realUrl, ip: userIp, expires: expiresAt });
+    
+    const key = crypto.scryptSync(secret, 'salt', 32);
+    const iv = Buffer.alloc(16, 0); // Flat initialization vector
+    const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+    
+    let token = cipher.update(payload, 'utf8', 'hex');
+    token += cipher.final('hex');
+    
+    return `/api/content/download/${token}`;
+  } catch (err) {
+    console.error("Encryption Failure:", err.message);
+    return realUrl; // Fallback to raw link if crypto fails
+  }
+}
+
 // ==========================================
 // USER PANEL ROUTES (Public Access via TMDb)
 // ==========================================
 
 // 1. Homepage Catalog: Fetches items with explicit database-layer optimization
-// Fix #7: Database query filters parameters straight via MongoDB .find() query instead of JS filtering
 router.get('/', async (req, res) => {
   try {
-    const { type } = req.query; // Extracts ?type=movie or ?type=series from URL parameter context
+    const { type } = req.query; 
     
-    // Build database search object dynamically
     const filterQuery = {};
     if (type === 'movie' || type === 'series') {
       filterQuery.type = type;
     }
 
-    // Pulls ONLY requested items out of MongoDB directly
     const localItems = await Content.find(filterQuery).sort({ createdAt: -1 });
     
-    // Convert saved database entries into rich TMDb profiles for the homepage
     const richItems = await Promise.all(localItems.map(async (item) => {
       const endpoint = item.type === 'series' ? `/tv/${item.tmdbId}` : `/movie/${item.tmdbId}`;
       const meta = await fetchFromTMDb(endpoint);
@@ -43,7 +66,6 @@ router.get('/', async (req, res) => {
       };
     }));
 
-    // Filter out any broken queries
     res.json(richItems.filter(i => i !== null));
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -51,8 +73,6 @@ router.get('/', async (req, res) => {
 });
 
 // 2. Real-time Search Route
-// Fix #9: Re-worded misleading code commentary context details
-// Comment: Connected directly to structural TMDb global search routes parameters engine
 router.get('/search', async (req, res) => {
   const { q } = req.query;
   if (!q) return res.json([]);
@@ -93,10 +113,10 @@ router.get('/search', async (req, res) => {
   }
 });
 
-// 3. Get Single Item Details (Combines global TMDb metadata with your local links)
+// 3. Get Single Item Details (🔒 SWAPS REAL DRIborderColor SEED LINKS WITH TEMPORARY TOKEN GATEWAYS)
 router.get('/:id', async (req, res) => {
   const tmdbId = req.params.id;
-  const { type } = req.query; // Expects ?type=movie or ?type=series from front-end URL
+  const { type } = req.query; 
   
   try {
     const endpoint = type === 'series' ? `/tv/${tmdbId}` : `/movie/${tmdbId}`;
@@ -104,12 +124,42 @@ router.get('/:id', async (req, res) => {
 
     if (!metadata) return res.status(404).json({ message: 'Title details not found globally' });
 
-    // Look up if we have download links stored inside MongoDB for this specific ID
     const localRecord = await Content.findOne({ tmdbId: tmdbId.toString() });
 
     let backdrops = [];
     if (metadata.images && metadata.images.backdrops) {
       backdrops = metadata.images.backdrops.slice(0, 4).map(b => `https://image.tmdb.org/t/p/w780${b.file_path}`);
+    }
+
+    // Capture the client's actual current visitor IP address
+    const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
+    let secureMovieLinks = [];
+    let secureSeasons = [];
+
+    // ✨ AUTOMATIC LINK PROTECTION HOOKS
+    if (localRecord) {
+      if (localRecord.movieLinks && localRecord.movieLinks.length > 0) {
+        secureMovieLinks = localRecord.movieLinks.map(link => ({
+          resolution: link.resolution,
+          // Hide real Driveseed URL completely behind token
+          downloadUrl: encryptUrl(link.downloadUrl, clientIp) 
+        }));
+      }
+
+      if (localRecord.seasons && localRecord.seasons.length > 0) {
+        secureSeasons = localRecord.seasons.map(season => ({
+          seasonNumber: season.seasonNumber,
+          resolutions: season.resolutions.map(res => ({
+            resolution: res.resolution,
+            batchLink: res.batchLink ? encryptUrl(res.batchLink, clientIp) : null,
+            episodes: res.episodes.map(ep => ({
+              episodeNumber: ep.episodeNumber,
+              downloadUrl: encryptUrl(ep.downloadUrl, clientIp) // Safe episode paths
+            }))
+          }))
+        }));
+      }
     }
 
     res.json({
@@ -119,9 +169,9 @@ router.get('/:id', async (req, res) => {
       coverImageUrl: `https://image.tmdb.org/t/p/w500${metadata.poster_path}`,
       screenshots: backdrops,
       type: type === 'series' ? 'series' : 'movie',
-      movieLinks: localRecord ? localRecord.movieLinks : [],
-      seasons: localRecord ? localRecord.seasons : [],
-      hasLinks: !!localRecord // Easy flag to tell frontend if links are available
+      movieLinks: secureMovieLinks, // Returns safe, encrypted tokens only
+      seasons: secureSeasons,       // Returns safe, encrypted tokens only
+      hasLinks: !!localRecord 
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -168,7 +218,6 @@ router.post('/request/:id', async (req, res) => {
 // ADMIN PANEL ROUTES (Management Operations)
 // ==========================================
 
-// 4. UPLOAD LINKS: Save downloadable links matching a tmdbId (🔒 SECURED)
 router.post('/add', async (req, res) => {
   if (!verifyAdminSession(req, res)) {
     return res.status(401).json({ message: "Unauthorized: Invalid Admin Password" });
@@ -189,7 +238,6 @@ router.post('/add', async (req, res) => {
   }
 });
 
-// 5. EDIT LINKS: Swap nested resolution download links (🔒 SECURED)
 router.put('/edit/:id', async (req, res) => {
   if (!verifyAdminSession(req, res)) {
     return res.status(401).json({ message: "Unauthorized: Invalid Admin Password" });
@@ -208,7 +256,6 @@ router.put('/edit/:id', async (req, res) => {
   }
 });
 
-// 6. DELETE LINKS: Wipe out download availability (🔒 SECURED)
 router.delete('/delete/:id', async (req, res) => {
   if (!verifyAdminSession(req, res)) {
     return res.status(401).json({ message: "Unauthorized: Invalid Admin Password" });
@@ -223,7 +270,6 @@ router.delete('/delete/:id', async (req, res) => {
   }
 });
 
-// 🔒 LOGIN ROUTE: Validates admin password vault access
 router.post('/verify-password', (req, res) => {
   const { password } = req.body;
   const secureMasterPassword = process.env.ADMIN_PASSWORD;
