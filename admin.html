@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard | MoviesMod</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="alerts.js"></script>
     <style>
         body { background-color: #0b0f19; color: #e2e8f0; }
         .form-card { background-color: #111827; border: 1px solid #1f2937; }
@@ -120,6 +121,7 @@
         let globalAdminContentCache = []; 
         let lockoutTimerInterval = null; 
 
+        // Evaluates persistent tracking data across layout initialization states
         function checkExistingLockout() {
             const lockoutUntil = localStorage.getItem('admin_lockout_until');
             if (lockoutUntil) {
@@ -127,6 +129,7 @@
                 const remainingMs = parseInt(lockoutUntil) - now;
                 
                 if (remainingMs > 0) {
+                    // Lockout timeframe is still running, fire up countdown loop instantly
                     startLocalLockoutCountdown(Math.ceil(remainingMs / 1000));
                 } else {
                     localStorage.removeItem('admin_lockout_until');
@@ -137,7 +140,6 @@
         async function verifyAdminKey() {
             if (lockoutTimerInterval) return;
 
-            const submitBtn = document.querySelector('#admin-lockbox button');
             const inputKey = document.getElementById('admin-secret-key').value.trim();
             if (!inputKey) {
                 alert("Please enter a password.");
@@ -162,30 +164,14 @@
                 } else {
                     if (res.status === 429 || data.retryAfter) {
                         const totalSeconds = data.retryAfter || 1800; 
+                        
+                        // Map precise absolute unix milliseconds boundary target
                         const lockoutEndTime = Date.now() + (totalSeconds * 1000);
                         localStorage.setItem('admin_lockout_until', lockoutEndTime);
 
                         startLocalLockoutCountdown(totalSeconds);
                     } else {
-                        // Dynamically update button based on remaining attempts sent from your server
-                        if (data.attemptsLeft !== undefined) {
-                            submitBtn.textContent = `❌ ${data.attemptsLeft} ${data.attemptsLeft === 1 ? 'TRY' : 'TRIES'} LEFT`;
-                            submitBtn.className = "w-full bg-amber-600 text-white font-bold py-2 rounded-lg cursor-pointer transition-all";
-                        } else if (data.message && data.message.toLowerCase().includes("tries left")) {
-                            // Backup parser in case your backend passes attempts directly as a text string message
-                            submitBtn.textContent = `❌ ${data.message.toUpperCase()}`;
-                            submitBtn.className = "w-full bg-amber-600 text-white font-bold py-2 rounded-lg cursor-pointer transition-all";
-                        } else {
-                            alert(`❌ ACCESS DENIED: ${data.message || 'Invalid Admin Password.'}`);
-                        }
-
-                        // Reset button look to normal after 2.5 seconds so they can see to try again
-                        setTimeout(() => {
-                            if (!lockoutTimerInterval) {
-                                submitBtn.textContent = "UNLOCK PANEL";
-                                submitBtn.className = "w-full bg-emerald-500 text-black font-bold py-2 rounded-lg cursor-pointer transition-all";
-                            }
-                        }, 2500);
+                        alert(`❌ ACCESS DENIED: ${data.message || 'Invalid Admin Password.'}`);
                     }
                 }
             } catch (err) {
@@ -222,8 +208,7 @@
                     const remainderSeconds = timeLeft % 60;
                     const displaySeconds = remainderSeconds < 10 ? '0' + remainderSeconds : remainderSeconds;
                     
-                    // Displays your exact requested copy string during the cooldown ban phase
-                    submitBtn.textContent = `⏳ YOU ARE LOCKED (${minutes}:${displaySeconds})`;
+                    submitBtn.textContent = `⏳ LOCKED OUT (${minutes}:${displaySeconds})`;
                     submitBtn.className = "w-full bg-red-950/40 text-red-400 font-bold py-2 rounded-lg cursor-not-allowed border border-red-900/50";
                     
                     timeLeft--;
@@ -548,8 +533,16 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             addMovieLinkField();
-            checkExistingLockout(); 
+            checkExistingLockout(); // Validates active ban states instantly on page load
         });
     </script>
+    <div id="custom-alert-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4 transition-all">
+    <div class="bg-[#111827] border border-gray-800 p-6 rounded-xl shadow-2xl max-w-sm w-full text-center transform scale-95 transition-all">
+        <div id="custom-alert-icon" class="text-3xl mb-3">⚠️</div>
+        <p id="custom-alert-message" class="text-sm text-gray-300 mb-6 font-medium leading-relaxed">Alert message goes here.</p>
+        <button type="button" onclick="closeCustomAlert()" class="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-bold py-2.5 rounded-lg cursor-pointer transition-colors shadow-lg">ACKNOWLEDGE</button>
+    </div>
+</div>
+
 </body>
 </html>
