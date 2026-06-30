@@ -120,7 +120,6 @@
         let globalAdminContentCache = []; 
         let lockoutTimerInterval = null; 
 
-        // Evaluates persistent tracking data across layout initialization states
         function checkExistingLockout() {
             const lockoutUntil = localStorage.getItem('admin_lockout_until');
             if (lockoutUntil) {
@@ -128,7 +127,6 @@
                 const remainingMs = parseInt(lockoutUntil) - now;
                 
                 if (remainingMs > 0) {
-                    // Lockout timeframe is still running, fire up countdown loop instantly
                     startLocalLockoutCountdown(Math.ceil(remainingMs / 1000));
                 } else {
                     localStorage.removeItem('admin_lockout_until');
@@ -139,6 +137,7 @@
         async function verifyAdminKey() {
             if (lockoutTimerInterval) return;
 
+            const submitBtn = document.querySelector('#admin-lockbox button');
             const inputKey = document.getElementById('admin-secret-key').value.trim();
             if (!inputKey) {
                 alert("Please enter a password.");
@@ -163,14 +162,30 @@
                 } else {
                     if (res.status === 429 || data.retryAfter) {
                         const totalSeconds = data.retryAfter || 1800; 
-                        
-                        // Map precise absolute unix milliseconds boundary target
                         const lockoutEndTime = Date.now() + (totalSeconds * 1000);
                         localStorage.setItem('admin_lockout_until', lockoutEndTime);
 
                         startLocalLockoutCountdown(totalSeconds);
                     } else {
-                        alert(`❌ ACCESS DENIED: ${data.message || 'Invalid Admin Password.'}`);
+                        // Dynamically update button based on remaining attempts sent from your server
+                        if (data.attemptsLeft !== undefined) {
+                            submitBtn.textContent = `❌ ${data.attemptsLeft} ${data.attemptsLeft === 1 ? 'TRY' : 'TRIES'} LEFT`;
+                            submitBtn.className = "w-full bg-amber-600 text-white font-bold py-2 rounded-lg cursor-pointer transition-all";
+                        } else if (data.message && data.message.toLowerCase().includes("tries left")) {
+                            // Backup parser in case your backend passes attempts directly as a text string message
+                            submitBtn.textContent = `❌ ${data.message.toUpperCase()}`;
+                            submitBtn.className = "w-full bg-amber-600 text-white font-bold py-2 rounded-lg cursor-pointer transition-all";
+                        } else {
+                            alert(`❌ ACCESS DENIED: ${data.message || 'Invalid Admin Password.'}`);
+                        }
+
+                        // Reset button look to normal after 2.5 seconds so they can see to try again
+                        setTimeout(() => {
+                            if (!lockoutTimerInterval) {
+                                submitBtn.textContent = "UNLOCK PANEL";
+                                submitBtn.className = "w-full bg-emerald-500 text-black font-bold py-2 rounded-lg cursor-pointer transition-all";
+                            }
+                        }, 2500);
                     }
                 }
             } catch (err) {
@@ -207,7 +222,8 @@
                     const remainderSeconds = timeLeft % 60;
                     const displaySeconds = remainderSeconds < 10 ? '0' + remainderSeconds : remainderSeconds;
                     
-                    submitBtn.textContent = `⏳ LOCKED OUT (${minutes}:${displaySeconds})`;
+                    // Displays your exact requested copy string during the cooldown ban phase
+                    submitBtn.textContent = `⏳ YOU ARE LOCKED (${minutes}:${displaySeconds})`;
                     submitBtn.className = "w-full bg-red-950/40 text-red-400 font-bold py-2 rounded-lg cursor-not-allowed border border-red-900/50";
                     
                     timeLeft--;
@@ -532,7 +548,7 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             addMovieLinkField();
-            checkExistingLockout(); // Validates active ban states instantly on page load
+            checkExistingLockout(); 
         });
     </script>
 </body>
