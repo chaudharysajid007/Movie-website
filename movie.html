@@ -68,13 +68,11 @@
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('content-container').classList.remove('hidden');
 
-                // Secure assignment via textContent
                 document.getElementById('media-title').textContent = data.title;
                 document.getElementById('media-desc').textContent = data.description || "No plot summary available currently.";
                 document.getElementById('media-cover').src = data.coverImageUrl;
                 document.getElementById('media-cover').alt = data.title;
 
-                // Secure Screenshot rendering loop (Removes XSS risk)
                 const screenBox = document.getElementById('screenshots-box');
                 screenBox.innerHTML = '';
                 if (data.screenshots && data.screenshots.length > 0) {
@@ -160,10 +158,10 @@
                     
                     data.seasons.forEach((season, sIdx) => {
                         const seasonWrapper = document.createElement('div');
-                        seasonWrapper.className = "border border-gray-800 rounded-lg overflow-hidden bg-[#1f2937]/50";
+                        seasonWrapper.className = "border border-gray-800 rounded-lg overflow-hidden bg-[#1f2937]/50 mb-2";
 
                         const accordionBtn = document.createElement('button');
-                        accordionBtn.className = "w-full text-left bg-[#1f2937] hover:bg-gray-700 px-4 py-3 font-bold text-emerald-400 flex justify-between items-center transition-colors";
+                        accordionBtn.className = "w-full text-left bg-[#1f2937] hover:bg-gray-700 px-4 py-3 font-bold text-emerald-400 flex justify-between items-center transition-colors cursor-pointer";
                         accordionBtn.onclick = () => toggleAccordion(`season-${sIdx}`);
 
                         const btnTitle = document.createElement('span');
@@ -180,7 +178,7 @@
 
                         season.resolutions.forEach((res) => {
                             const resWrapper = document.createElement('div');
-                            resWrapper.className = "border-l-2 border-emerald-500 pl-3";
+                            resWrapper.className = "border-l-2 border-emerald-500 pl-3 mb-2";
 
                             const topMetaRow = document.createElement('div');
                             topMetaRow.className = "flex items-center justify-between mb-2";
@@ -208,7 +206,7 @@
                                 const epLink = document.createElement('a');
                                 epLink.href = ep.downloadUrl;
                                 epLink.target = "_blank";
-                                epLink.className = "bg-gray-800 hover:bg-emerald-600 hover:text-black border border-gray-700 text-xs px-2 py-1.5 rounded transition-all font-bold text-center";
+                                epLink.className = "bg-gray-800 hover:bg-emerald-600 hover:text-black border border-gray-700 text-xs px-2 py-1.5 rounded transition-all font-bold text-center text-white decoration-none";
                                 epLink.textContent = `EP ${ep.episodeNumber}`;
 
                                 const epReportBtn = document.createElement('button');
@@ -228,7 +226,7 @@
                                 const batchLinkAnchor = document.createElement('a');
                                 batchLinkAnchor.href = res.batchLink;
                                 batchLinkAnchor.target = "_blank";
-                                batchLinkAnchor.className = "inline-flex items-center text-xs text-amber-400 hover:underline font-semibold gap-1 mt-1";
+                                batchLinkAnchor.className = "inline-flex items-center text-xs text-amber-400 hover:underline font-semibold gap-1 mt-1 mb-2";
                                 batchLinkAnchor.textContent = `📦 Download Complete Season Batch (${res.resolution}) ⚡`;
                                 resWrapper.appendChild(batchLinkAnchor);
                             }
@@ -245,7 +243,7 @@
                         container.appendChild(seasonWrapper);
                     });
 
-                    container.appendChild(container);
+                    // ✨ Fixed: Removed the self-appending bug line completely here!
                     downloadZone.appendChild(container);
                 }
 
@@ -330,18 +328,18 @@
             }
         }
 
-        // Switched from window.onload to DOMContentLoaded for high security uniformity (Item 11)
         document.addEventListener('DOMContentLoaded', () => {
             loadPageDetails();
         });
     </script>
+
     <div id="custom-alert-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4 transition-all">
-    <div class="bg-[#111827] border border-gray-800 p-6 rounded-xl shadow-2xl max-w-sm w-full text-center transform scale-95 transition-all">
-        <div id="custom-alert-icon" class="text-3xl mb-3">⚠️</div>
-        <p id="custom-alert-message" class="text-sm text-gray-300 mb-6 font-medium leading-relaxed">Alert message goes here.</p>
-        <button type="button" onclick="closeCustomAlert()" class="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-bold py-2.5 rounded-lg cursor-pointer transition-colors shadow-lg">ACKNOWLEDGE</button>
+        <div class="bg-[#111827] border border-gray-800 p-6 rounded-xl shadow-2xl max-w-sm w-full text-center transform scale-95 transition-all">
+            <div id="custom-alert-icon" class="text-3xl mb-3">⚠️</div>
+            <p id="custom-alert-message" class="text-sm text-gray-300 mb-6 font-medium leading-relaxed">Alert message goes here.</p>
+            <button type="button" onclick="closeCustomAlert()" class="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-bold py-2.5 rounded-lg cursor-pointer transition-colors shadow-lg">ACKNOWLEDGE</button>
+        </div>
     </div>
-</div>
 
 </body>
 </html>
