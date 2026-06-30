@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Download Media - MoviesMod</title>
+    <title>Download Media - Sajidflix</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <style>
         body { background-color: #0b0f19; color: #e2e8f0; }
@@ -67,106 +67,185 @@
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('content-container').classList.remove('hidden');
 
-                document.getElementById('media-title').innerText = data.title;
-                document.getElementById('media-desc').innerText = data.description || "No plot summary available currently.";
+                // Secure assignment via textContent
+                document.getElementById('media-title').textContent = data.title;
+                document.getElementById('media-desc').textContent = data.description || "No plot summary available currently.";
                 document.getElementById('media-cover').src = data.coverImageUrl;
+                document.getElementById('media-cover').alt = data.title;
 
+                // Secure Screenshot rendering loop (Removes XSS risk)
                 const screenBox = document.getElementById('screenshots-box');
                 screenBox.innerHTML = '';
                 if (data.screenshots && data.screenshots.length > 0) {
                     data.screenshots.forEach(url => {
-                        screenBox.innerHTML += `<img src="${url}" class="rounded border border-gray-800 hover:scale-102 transition-transform shadow w-full aspect-video object-cover">`;
+                        const img = document.createElement('img');
+                        img.src = url;
+                        img.className = "rounded border border-gray-800 hover:scale-102 transition-transform shadow w-full aspect-video object-cover";
+                        screenBox.appendChild(img);
                     });
                 } else {
-                    screenBox.innerHTML = `<p class="text-xs text-gray-500 italic col-span-2">No dynamic backdrop images provided.</p>`;
+                    const fallback = document.createElement('p');
+                    fallback.className = "text-xs text-gray-500 italic col-span-2";
+                    fallback.textContent = "No dynamic backdrop images provided.";
+                    screenBox.appendChild(fallback);
                 }
 
                 const downloadZone = document.getElementById('download-zone');
+                downloadZone.innerHTML = '';
                 
                 if (!data.hasLinks) {
-                    downloadZone.innerHTML = `
-                        <div class="text-center py-6">
-                            <p class="text-gray-400 text-sm mb-4">We don't have download links uploaded for this title yet.</p>
-                            <button id="btn-request" onclick="sendTelegramRequest()" class="bg-emerald-500 hover:bg-emerald-600 text-black font-extrabold px-6 py-3 rounded-xl shadow transition-all transform active:scale-95 text-xs uppercase tracking-wider cursor-pointer">
-                                📨 Request Download Link
-                            </button>
-                            <p id="request-status" class="text-xs text-emerald-400 mt-3 hidden font-medium"></p>
-                        </div>`;
+                    const noLinksDiv = document.createElement('div');
+                    noLinksDiv.className = "text-center py-6";
+
+                    const msg = document.createElement('p');
+                    msg.className = "text-gray-400 text-sm mb-4";
+                    msg.textContent = "We don't have download links uploaded for this title yet.";
+
+                    const btn = document.createElement('button');
+                    btn.id = "btn-request";
+                    btn.className = "bg-emerald-500 hover:bg-emerald-600 text-black font-extrabold px-6 py-3 rounded-xl shadow transition-all transform active:scale-95 text-xs uppercase tracking-wider cursor-pointer";
+                    btn.textContent = "📨 Request Download Link";
+                    btn.onclick = sendTelegramRequest;
+
+                    const status = document.createElement('p');
+                    status.id = "request-status";
+                    status.className = "text-xs text-emerald-400 mt-3 hidden font-medium";
+
+                    noLinksDiv.appendChild(msg);
+                    noLinksDiv.appendChild(btn);
+                    noLinksDiv.appendChild(status);
+                    downloadZone.appendChild(noLinksDiv);
                     return;
                 }
 
                 if (data.type === 'movie') {
-                    let movieHTML = `<div class="flex flex-col gap-4">`;
-                    data.movieLinks.forEach((link, idx) => {
-                        movieHTML += `
-                            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-[#1f2937]/30 border border-gray-800/80 p-2 rounded-xl">
-                                <a href="${link.downloadUrl}" target="_blank" class="flex-1 flex items-center justify-between bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white font-bold px-4 py-3 rounded-lg shadow transition-all duration-200">
-                                    <span>Download Movie Direct Link</span>
-                                    <span class="bg-black/30 px-3 py-1 rounded text-xs tracking-wider">${link.resolution}</span>
-                                </a>
-                                <button onclick="reportBrokenLink('${data.title.replace(/'/g, "\\'")}', '${contentId}', 'movie', '${link.resolution} Main Movie Link', this)" class="bg-red-950/40 text-red-400 border border-red-900/50 px-4 py-3 sm:py-3.5 rounded-lg text-xs font-bold hover:bg-red-900 hover:text-white transition-all cursor-pointer whitespace-nowrap">
-                                    🚨 Report Broken
-                                </button>
-                            </div>`;
+                    const container = document.createElement('div');
+                    container.className = "flex flex-col gap-4";
+
+                    data.movieLinks.forEach((link) => {
+                        const row = document.createElement('div');
+                        row.className = "flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-[#1f2937]/30 border border-gray-800/80 p-2 rounded-xl";
+
+                        const downloadAnchor = document.createElement('a');
+                        downloadAnchor.href = link.downloadUrl;
+                        downloadAnchor.target = "_blank";
+                        downloadAnchor.className = "flex-1 flex items-center justify-between bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white font-bold px-4 py-3 rounded-lg shadow transition-all duration-200";
+
+                        const labelSpan = document.createElement('span');
+                        labelSpan.textContent = "Download Movie Direct Link";
+
+                        const resSpan = document.createElement('span');
+                        resSpan.className = "bg-black/30 px-3 py-1 rounded text-xs tracking-wider";
+                        resSpan.textContent = link.resolution;
+
+                        downloadAnchor.appendChild(labelSpan);
+                        downloadAnchor.appendChild(resSpan);
+
+                        const reportBtn = document.createElement('button');
+                        reportBtn.className = "bg-red-950/40 text-red-400 border border-red-900/50 px-4 py-3 sm:py-3.5 rounded-lg text-xs font-bold hover:bg-red-900 hover:text-white transition-all cursor-pointer whitespace-nowrap";
+                        reportBtn.textContent = "🚨 Report Broken";
+                        reportBtn.onclick = () => reportBrokenLink(data.title, contentId, 'movie', `${link.resolution} Main Movie Link`, reportBtn);
+
+                        row.appendChild(downloadAnchor);
+                        row.appendChild(reportBtn);
+                        container.appendChild(row);
                     });
-                    movieHTML += `</div>`;
-                    downloadZone.innerHTML = movieHTML;
+
+                    downloadZone.appendChild(container);
 
                 } else {
-                    let seriesHTML = `<div class="flex flex-col gap-4">`;
+                    const container = document.createElement('div');
+                    container.className = "flex flex-col gap-4";
                     
                     data.seasons.forEach((season, sIdx) => {
-                        seriesHTML += `
-                            <div class="border border-gray-800 rounded-lg overflow-hidden bg-[#1f2937]/50">
-                                <button onclick="toggleAccordion('season-${sIdx}')" class="w-full text-left bg-[#1f2937] hover:bg-gray-700 px-4 py-3 font-bold text-emerald-400 flex justify-between items-center transition-colors">
-                                    <span>💥 Season ${season.seasonNumber} Breakdown</span>
-                                    <span>🔻</span>
-                                </button>
-                                
-                                <div id="season-${sIdx}" class="hidden p-4 flex flex-col gap-4 border-t border-gray-800 bg-[#0f172a]">`;
-                        
-                        season.resolutions.forEach((res, rIdx) => {
-                            seriesHTML += `
-                                <div class="border-l-2 border-emerald-500 pl-3">
-                                    <div class="flex items-center justify-between mb-2">
-                                        <h4 class="text-sm font-bold text-white uppercase tracking-wide bg-gray-800 inline-block px-2 py-0.5 rounded text-xs">${res.resolution} Quality</h4>
-                                        ${res.batchLink ? `
-                                            <button onclick="reportBrokenLink('${data.title.replace(/'/g, "\\'")}', '${contentId}', 'series', 'Season ${season.seasonNumber} - ${res.resolution} Batch Folder Link', this)" class="text-[10px] bg-red-950/40 text-red-400 border border-red-900/30 px-2 py-0.5 rounded hover:bg-red-900 hover:text-white transition-colors cursor-pointer">
-                                                🚨 Report Batch Broken
-                                            </button>
-                                        ` : ''}
-                                    </div>
-                                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">`;
-                                    
-                            res.episodes.forEach(ep => {
-                                seriesHTML += `
-                                    <div class="flex flex-col gap-1 bg-[#111827] p-1.5 rounded border border-gray-800">
-                                        <a href="${ep.downloadUrl}" target="_blank" class="bg-gray-800 hover:bg-emerald-600 hover:text-black border border-gray-700 text-xs px-2 py-1.5 rounded transition-all font-bold text-center">
-                                            EP ${ep.episodeNumber}
-                                        </a>
-                                        <button onclick="reportBrokenLink('${data.title.replace(/'/g, "\\'")}', '${contentId}', 'series', 'Season ${season.seasonNumber} - ${res.resolution} - Episode ${ep.episodeNumber}', this)" class="text-[9px] text-red-400 hover:underline text-center cursor-pointer">
-                                            Report Dead
-                                        </button>
-                                    </div>`;
-                            });
-                            
-                            seriesHTML += `</div>`;
-                            
+                        const seasonWrapper = document.createElement('div');
+                        seasonWrapper.className = "border border-gray-800 rounded-lg overflow-hidden bg-[#1f2937]/50";
+
+                        const accordionBtn = document.createElement('button');
+                        accordionBtn.className = "w-full text-left bg-[#1f2937] hover:bg-gray-700 px-4 py-3 font-bold text-emerald-400 flex justify-between items-center transition-colors";
+                        accordionBtn.onclick = () => toggleAccordion(`season-${sIdx}`);
+
+                        const btnTitle = document.createElement('span');
+                        btnTitle.textContent = `💥 Season ${season.seasonNumber} Breakdown`;
+                        const btnIcon = document.createElement('span');
+                        btnIcon.textContent = "🔻";
+
+                        accordionBtn.appendChild(btnTitle);
+                        accordionBtn.appendChild(btnIcon);
+
+                        const contentDiv = document.createElement('div');
+                        contentDiv.id = `season-${sIdx}`;
+                        contentDiv.className = "hidden p-4 flex flex-col gap-4 border-t border-gray-800 bg-[#0f172a]";
+
+                        season.resolutions.forEach((res) => {
+                            const resWrapper = document.createElement('div');
+                            resWrapper.className = "border-l-2 border-emerald-500 pl-3";
+
+                            const topMetaRow = document.createElement('div');
+                            topMetaRow.className = "flex items-center justify-between mb-2";
+
+                            const qualityHeader = document.createElement('h4');
+                            qualityHeader.className = "text-sm font-bold text-white uppercase tracking-wide bg-gray-800 inline-block px-2 py-0.5 rounded text-xs";
+                            qualityHeader.textContent = `${res.resolution} Quality`;
+                            topMetaRow.appendChild(qualityHeader);
+
                             if (res.batchLink) {
-                                seriesHTML += `
-                                    <a href="${res.batchLink}" target="_blank" class="inline-flex items-center text-xs text-amber-400 hover:underline font-semibold gap-1 mt-1">
-                                        📦 Download Complete Season Batch (${res.resolution}) ⚡
-                                    </a>`;
+                                const reportBatchBtn = document.createElement('button');
+                                reportBatchBtn.className = "text-[10px] bg-red-950/40 text-red-400 border border-red-900/30 px-2 py-0.5 rounded hover:bg-red-900 hover:text-white transition-colors cursor-pointer";
+                                reportBatchBtn.textContent = "🚨 Report Batch Broken";
+                                reportBatchBtn.onclick = () => reportBrokenLink(data.title, contentId, 'series', `Season ${season.seasonNumber} - ${res.resolution} Batch Folder Link`, reportBatchBtn);
+                                topMetaRow.appendChild(reportBatchBtn);
                             }
-                            
-                            seriesHTML += `</div><hr class="border-gray-900 my-1">`;
+
+                            const epGrid = document.createElement('div');
+                            epGrid.className = "grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2";
+
+                            res.episodes.forEach(ep => {
+                                const epCard = document.createElement('div');
+                                epCard.className = "flex flex-col gap-1 bg-[#111827] p-1.5 rounded border border-gray-800";
+
+                                const epLink = document.createElement('a');
+                                epLink.href = ep.downloadUrl;
+                                epLink.target = "_blank";
+                                epLink.className = "bg-gray-800 hover:bg-emerald-600 hover:text-black border border-gray-700 text-xs px-2 py-1.5 rounded transition-all font-bold text-center";
+                                epLink.textContent = `EP ${ep.episodeNumber}`;
+
+                                const epReportBtn = document.createElement('button');
+                                epReportBtn.className = "text-[9px] text-red-400 hover:underline text-center cursor-pointer";
+                                epReportBtn.textContent = "Report Dead";
+                                epReportBtn.onclick = () => reportBrokenLink(data.title, contentId, 'series', `Season ${season.seasonNumber} - ${res.resolution} - Episode ${ep.episodeNumber}`, epReportBtn);
+
+                                epCard.appendChild(epLink);
+                                epCard.appendChild(epReportBtn);
+                                epGrid.appendChild(epCard);
+                            });
+
+                            resWrapper.appendChild(topMetaRow);
+                            resWrapper.appendChild(epGrid);
+
+                            if (res.batchLink) {
+                                const batchLinkAnchor = document.createElement('a');
+                                batchLinkAnchor.href = res.batchLink;
+                                batchLinkAnchor.target = "_blank";
+                                batchLinkAnchor.className = "inline-flex items-center text-xs text-amber-400 hover:underline font-semibold gap-1 mt-1";
+                                batchLinkAnchor.textContent = `📦 Download Complete Season Batch (${res.resolution}) ⚡`;
+                                resWrapper.appendChild(batchLinkAnchor);
+                            }
+
+                            const hr = document.createElement('hr');
+                            hr.className = "border-gray-900 my-1";
+
+                            resWrapper.appendChild(hr);
+                            contentDiv.appendChild(resWrapper);
                         });
-                        
-                        seriesHTML += `</div></div>`;
+
+                        seasonWrapper.appendChild(accordionBtn);
+                        seasonWrapper.appendChild(contentDiv);
+                        container.appendChild(seasonWrapper);
                     });
-                    
-                    seriesHTML += `</div>`;
-                    downloadZone.innerHTML = seriesHTML;
+
+                    container.appendChild(container);
+                    downloadZone.appendChild(container);
                 }
 
             } catch (err) {
@@ -186,7 +265,7 @@
             const statusTxt = document.getElementById('request-status');
 
             btn.disabled = true;
-            btn.innerText = "⏳ Requesting...";
+            btn.textContent = "⏳ Requesting...";
 
             try {
                 const response = await fetch(REQUEST_URL, {
@@ -203,8 +282,8 @@
 
                 if (response.ok) {
                     btn.className = "bg-gray-800 text-gray-500 font-bold px-6 py-3 rounded-xl shadow cursor-not-allowed text-xs uppercase tracking-wider";
-                    btn.innerText = "✅ Requested Successfully";
-                    statusTxt.innerText = "Sajid has been instantly pinged via Telegram! Links will be up shortly.";
+                    btn.textContent = "✅ Requested Successfully";
+                    statusTxt.textContent = "Sajid has been instantly pinged via Telegram! Links will be up shortly.";
                     statusTxt.className = "text-xs text-emerald-400 mt-3 font-medium";
                 } else {
                     throw new Error(result.message || "Request failed");
@@ -212,22 +291,20 @@
             } catch (err) {
                 console.error(err);
                 btn.disabled = false;
-                btn.innerText = "📨 Request Download Link";
-                statusTxt.innerText = "Failed to dispatch request. Try again later.";
+                btn.textContent = "📨 Request Download Link";
+                statusTxt.textContent = "Failed to dispatch request. Try again later.";
                 statusTxt.className = "text-xs text-red-400 mt-3 font-medium";
             }
         }
 
-        // 🚨 NEW MODULE: ASYNC BROKEN LINK SYSTEM NOTIFIER
         async function reportBrokenLink(title, tmdbId, type, details, element) {
             if (element.disabled) return;
             
-            const originalText = element.innerText;
+            const originalText = element.textContent;
             element.disabled = true;
-            element.innerText = "⏳ Reporting...";
+            element.textContent = "⏳ Reporting...";
 
             try {
-                // Utilizing the live request route structure to carry payload diagnostics
                 const response = await fetch(`${API_BASE}/request/${tmdbId}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -238,7 +315,7 @@
                 });
 
                 if (response.ok) {
-                    element.innerText = "✅ Reported";
+                    element.textContent = "✅ Reported";
                     element.className = element.className.replace(/bg-red-950\/40|text-red-400|hover:bg-red-900/g, '') + " bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed";
                     alert(`✅ Thank you! The issue with "${details}" has been forwarded directly to Sajid's control center.`);
                 } else {
@@ -247,12 +324,15 @@
             } catch (err) {
                 console.error(err);
                 element.disabled = false;
-                element.innerText = originalText;
+                element.textContent = originalText;
                 alert("❌ Could not connect to reporting stream. Please try again later.");
             }
         }
 
-        window.onload = () => loadPageDetails();
+        // Switched from window.onload to DOMContentLoaded for high security uniformity (Item 11)
+        document.addEventListener('DOMContentLoaded', () => {
+            loadPageDetails();
+        });
     </script>
 </body>
 </html>

@@ -25,7 +25,6 @@
                 <a href="#" onclick="filterByType('movie')" class="block text-gray-300 hover:text-emerald-400 font-semibold p-2 rounded hover:bg-gray-800/50 transition-colors">🎬 Movies</a>
                 <a href="#" onclick="filterByType('series')" class="block text-gray-300 hover:text-emerald-400 font-semibold p-2 rounded hover:bg-gray-800/50 transition-colors">📺 Series & Anime</a>
                 <a href="https://forms.gle/MysvZiQ4YQRERT6M7" target="_blank" class="block text-gray-300 hover:text-emerald-400 font-semibold p-2 rounded hover:bg-gray-800/50 transition-colors">📨 Request Content</a>
-                <a href="admin.html" class="block text-gray-300 hover:text-emerald-400 font-semibold p-2 rounded hover:bg-gray-800/50 transition-colors">🔒 Admin Dashboard</a>
             </div>
         </div>
         
@@ -60,6 +59,7 @@
         </div>
 
         <div id="movie-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6"></div>
+        <div id="error-display" class="hidden text-center text-red-400 font-semibold bg-red-950/30 border border-red-900/50 p-4 rounded-xl max-w-md mx-auto my-6"></div>
     </main>
 
     <script>
@@ -70,10 +70,10 @@
         const sectionTitle = document.getElementById('section-title');
         const sidebarMenu = document.getElementById('sidebar-menu');
         const sidebarOverlay = document.getElementById('sidebar-overlay');
+        const errorDisplay = document.getElementById('error-display');
         
         let searchTimer;
 
-        // 🍔 SIDEBAR INTERACTION LOGIC
         function toggleSidebar() {
             const isHidden = sidebarMenu.classList.contains('-translate-x-full');
             if (isHidden) {
@@ -87,40 +87,59 @@
             }
         }
 
-        // Centralized Catalog Rendering Method
+        // Safe Rendering Engine securing endpoints against Cross-Site Scripting (XSS)
         function renderGrid(items) {
             movieGrid.innerHTML = '';
+            errorDisplay.classList.add('hidden');
+            
             items.forEach(item => {
                 const card = document.createElement('div');
                 card.className = "bg-[#111827] border border-gray-800 rounded-lg overflow-hidden group shadow-md hover:border-emerald-500 transition-all duration-300 cursor-pointer";
-                
-                // 🌟 PASSING BOTH ID AND TYPE TO DETAILS VIEW 
                 card.onclick = () => window.location.href = `movie.html?id=${item._id}&type=${item.type}`;
 
-                card.innerHTML = `
-                    <div class="relative overflow-hidden aspect-[2/3]">
-                        <img src="${item.coverImageUrl}" alt="${item.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy">
-                        <span class="absolute top-2 left-2 bg-emerald-500 text-black text-[10px] font-bold uppercase px-2 py-0.5 rounded shadow">
-                            ${item.type}
-                        </span>
-                    </div>
-                    <div class="p-3">
-                        <h3 class="font-bold text-sm line-clamp-2 group-hover:text-emerald-400 transition-colors">${item.title}</h3>
-                    </div>
-                `;
+                // Image Element Setup
+                const imageContainer = document.createElement('div');
+                imageContainer.className = "relative overflow-hidden aspect-[2/3]";
+                
+                const img = document.createElement('img');
+                img.src = item.coverImageUrl;
+                img.alt = item.title;
+                img.className = "w-full h-full object-cover group-hover:scale-105 transition-transform duration-300";
+                img.setAttribute('loading', 'lazy');
+                
+                const typeBadge = document.createElement('span');
+                typeBadge.className = "absolute top-2 left-2 bg-emerald-500 text-black text-[10px] font-bold uppercase px-2 py-0.5 rounded shadow";
+                typeBadge.textContent = item.type;
+
+                imageContainer.appendChild(img);
+                imageContainer.appendChild(typeBadge);
+
+                // Safe Title Element Setup via textContent
+                const infoContainer = document.createElement('div');
+                infoContainer.className = "p-3";
+                
+                const titleHeading = document.createElement('h3');
+                titleHeading.className = "font-bold text-sm line-clamp-2 group-hover:text-emerald-400 transition-colors";
+                titleHeading.textContent = item.title;
+
+                infoContainer.appendChild(titleHeading);
+                
+                card.appendChild(imageContainer);
+                card.appendChild(infoContainer);
                 movieGrid.appendChild(card);
             });
         }
 
-        // Fetch Landing Page Catalog (Active Uploaded Stored Items)
         async function fetchCatalog(url = API_BASE_URL) {
             try {
+                errorDisplay.classList.add('hidden');
                 loadingSpinner.style.display = 'flex';
                 movieGrid.innerHTML = '';
                 
                 const response = await fetch(url);
-                const items = await response.json();
+                if(!response.ok) throw new Error("Could not sync data library views.");
                 
+                const items = await response.json();
                 loadingSpinner.style.display = 'none';
 
                 if(items.length === 0) {
@@ -132,24 +151,27 @@
             } catch (err) {
                 loadingSpinner.style.display = 'none';
                 console.error("UI Render error:", err);
+                errorDisplay.textContent = `⚠️ Error: ${err.message || "Failed to load catalogue entries."}`;
+                errorDisplay.classList.remove('hidden');
             }
         }
 
-        // Filter display catalogue via Sidebar triggers
         async function filterByType(type) {
             toggleSidebar();
             searchBar.value = "";
             sectionTitle.innerText = type === 'movie' ? "🎬 EXPLORE MOVIES" : "📺 EXPLORE SERIES & ANIME";
             
             try {
+                errorDisplay.classList.add('hidden');
                 loadingSpinner.style.display = 'flex';
                 movieGrid.innerHTML = '';
                 
-                const response = await fetch(API_BASE_URL);
-                const items = await response.json();
+                // Backend query filter optimized execution parameters
+                const response = await fetch(`${API_BASE_URL}?type=${type}`);
+                if(!response.ok) throw new Error("Failed to filter catalog via server endpoint.");
                 
+                const filteredItems = await response.json();
                 loadingSpinner.style.display = 'none';
-                const filteredItems = items.filter(item => item.type === type);
                 
                 if(filteredItems.length === 0) {
                     movieGrid.innerHTML = `<p class="col-span-full text-center text-gray-400 my-8">No items uploaded here yet.</p>`;
@@ -159,26 +181,34 @@
             } catch (err) {
                 loadingSpinner.style.display = 'none';
                 console.error("Filter evaluation error:", err);
+                errorDisplay.textContent = `⚠️ Error: ${err.message || "Failed to load directory items."}`;
+                errorDisplay.classList.remove('hidden');
             }
         }
 
-        // Live Real-Time Search Event Listener (Connected to TMDb backend endpoints)
         searchBar.addEventListener('input', (e) => {
             const query = e.target.value.trim();
             clearTimeout(searchTimer);
 
+            if (query.length === 0) {
+                sectionTitle.innerText = "LATEST UPLOADS";
+                fetchCatalog();
+                return;
+            }
+
+            // Character threshold protection constraint
+            if (query.length < 3) return;
+
             searchTimer = setTimeout(() => {
-                if(query.length >= 1) {
-                    sectionTitle.innerText = `SEARCH RESULTS FOR: "${query.toUpperCase()}"`;
-                    fetchCatalog(`${API_BASE_URL}/search?q=${query}`);
-                } else if (query.length === 0) {
-                    sectionTitle.innerText = "LATEST UPLOADS";
-                    fetchCatalog();
-                }
+                sectionTitle.innerText = `SEARCH RESULTS FOR: "${query.toUpperCase()}"`;
+                fetchCatalog(`${API_BASE_URL}/search?q=${query}`);
             }, 300);
         });
 
-        window.onload = () => fetchCatalog();
+        // Safe listener lifecycle registration initialization instead of window.onload
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchCatalog();
+        });
     </script>
 </body>
 </html>

@@ -14,10 +14,20 @@ const verifyAdminSession = (req, res) => {
 // USER PANEL ROUTES (Public Access via TMDb)
 // ==========================================
 
-// 1. Homepage Catalog: Fetches what items you currently have saved with links
+// 1. Homepage Catalog: Fetches items with explicit database-layer optimization
+// Fix #7: Database query filters parameters straight via MongoDB .find() query instead of JS filtering
 router.get('/', async (req, res) => {
   try {
-    const localItems = await Content.find().sort({ createdAt: -1 });
+    const { type } = req.query; // Extracts ?type=movie or ?type=series from URL parameter context
+    
+    // Build database search object dynamically
+    const filterQuery = {};
+    if (type === 'movie' || type === 'series') {
+      filterQuery.type = type;
+    }
+
+    // Pulls ONLY requested items out of MongoDB directly
+    const localItems = await Content.find(filterQuery).sort({ createdAt: -1 });
     
     // Convert saved database entries into rich TMDb profiles for the homepage
     const richItems = await Promise.all(localItems.map(async (item) => {
@@ -40,7 +50,9 @@ router.get('/', async (req, res) => {
   }
 });
 
-// 2. Real-time Search Route (Queries TMDb live instead of local Mongo indexes)
+// 2. Real-time Search Route
+// Fix #9: Re-worded misleading code commentary context details
+// Comment: Connected directly to structural TMDb global search routes parameters engine
 router.get('/search', async (req, res) => {
   const { q } = req.query;
   if (!q) return res.json([]);
@@ -116,7 +128,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// 📬 NEW: AUTOMATED TELEGRAM CONTENT REQUEST NOTIFICATION ROUTE
+// 📬 TELEGRAM CONTENT REQUEST NOTIFICATION ROUTE
 router.post('/request/:id', async (req, res) => {
   const tmdbId = req.params.id;
   const { title, type } = req.body;
@@ -128,12 +140,11 @@ router.post('/request/:id', async (req, res) => {
     return res.status(500).json({ message: "Notification server variables misconfigured" });
   }
 
-  // Compose an elegant alert message for your phone
   const alertMessage = `🚨 *New Sajidflix Content Request!*\n\n` +
                        `🎬 *Title:* ${title}\n` +
                        `🏷️ *Type:* ${type.toUpperCase()}\n` +
-                       `🆔 *TMDb ID:* \`${tmdbId}\`\n\n` +
-                       `👉 _Go to your Admin Panel, create an entry with this TMDb ID and attach your download links!_`;
+                       `🆔 *Database ID:* \`${tmdbId}\`\n\n` +
+                       `👉 _Go to your Admin Panel, create an entry with this ID and attach your download links!_`;
 
   try {
     const telegramUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
@@ -164,7 +175,7 @@ router.post('/add', async (req, res) => {
   }
 
   const item = new Content({
-    tmdbId: req.body.tmdbId, // Links directly to TMDb 
+    tmdbId: req.body.tmdbId, 
     type: req.body.type,
     movieLinks: req.body.movieLinks, 
     seasons: req.body.seasons        
@@ -185,7 +196,6 @@ router.put('/edit/:id', async (req, res) => {
   }
 
   try {
-    // Find by tmdbId instead of internal MongoDB ObjectIds
     const updatedItem = await Content.findOneAndUpdate(
       { tmdbId: req.params.id }, 
       req.body, 
