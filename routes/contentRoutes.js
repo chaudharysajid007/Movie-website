@@ -50,12 +50,16 @@ function encryptUrl(realUrl, userIp) {
 /**
  * 🔐 DYNAMIC LINK REDIRECT GATEWAY WITH ADAPTIVE REDIRECTS
  * Route: GET /api/content/download/:token
- * Decrypts the link token, matches IP constraints, and checks 11-hour expiration.
  */
 router.get('/download/:token', async (req, res) => {
-    // 🌐 DYNAMIC FRONTEND VARIABLE CONFIGURATION
+    // 🌐 STRICT FALLBACK: Points explicitly to your repository folder path
     const fallbackDomain = process.env.FRONTEND_URL || 'https://chaudharysajid007.github.io/Movie-website/';
-    const destinationDomain = req.headers.referer || fallbackDomain;
+    
+    // Safety check: If the browser referer header is just the root github.io without the folder, force the folder path
+    let destinationDomain = req.headers.referer || fallbackDomain;
+    if (destinationDomain === 'https://chaudharysajid007.github.io' || destinationDomain === 'https://chaudharysajid007.github.io/') {
+        destinationDomain = fallbackDomain;
+    }
 
     try {
         const { token } = req.params;
@@ -100,7 +104,6 @@ router.get('/download/:token', async (req, res) => {
             
             // If DriveSeed drops a 404 error, or tries to issue an error redirection loop
             if (linkCheck.status === 404 || linkCheck.status === 301 || linkCheck.status === 302) {
-                // Return them safely straight back to your active frontend domain layout instead!
                 return res.redirect(destinationDomain);
             }
         } catch (fetchErr) {
@@ -116,6 +119,7 @@ router.get('/download/:token', async (req, res) => {
         return res.redirect(destinationDomain);
     }
 });
+
 
 // 1. Homepage Catalog: Fetches items with explicit database-layer optimization
 router.get('/', async (req, res) => {
