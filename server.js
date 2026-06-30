@@ -12,16 +12,19 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// Fix #5: Brute-Force Gatekeeper (Rate Limiting for password validation endpoint)
-// Restricts IPs to a maximum of 5 password verification attempts per 15 minutes
+// Hardened Brute-Force Gatekeeper: 3 wrong attempts = 30-minute lockdown
 const passwordVerifyLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, 
-  message: { 
-    message: "🚨 TOO MANY ATTEMPTS: Your access has been locked for 15 minutes. Please try again later." 
+  windowMs: 30 * 60 * 1000, // 30 minutes in milliseconds
+  max: 3, // Limit each IP to 3 requests per windowMs
+  handler: (req, res) => {
+    res.status(429).json({ 
+      success: false, 
+      message: "🚨 BRUTE FORCE ALERT: Too many incorrect attempts. Access has been locked for 30 minutes.",
+      retryAfter: 30 * 60 // Tell the frontend exactly how many seconds to wait (1800s)
+    });
   },
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false,  // Disable the `X-RateLimit-*` headers
+  standardHeaders: true, 
+  legacyHeaders: false,  
 });
 
 // Secure Extraction

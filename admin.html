@@ -20,7 +20,7 @@
             <h2 class="text-xl font-black text-emerald-400 mb-2">🔒 ADMIN VERIFICATION</h2>
             <p class="text-xs text-gray-400 mb-4">Authorized Personnel Only</p>
             <input type="password" id="admin-secret-key" placeholder="Enter Admin Password" class="mb-4 text-center">
-            <button type="button" onclick="verifyAdminKey()" class="w-full bg-emerald-500 text-black font-bold py-2 rounded-lg cursor-pointer">UNLOCK PANEL</button>
+            <button type="button" onclick="verifyAdminKey()" class="w-full bg-emerald-500 text-black font-bold py-2 rounded-lg cursor-pointer transition-all">UNLOCK PANEL</button>
         </div>
     </div>
 
@@ -117,10 +117,18 @@
         const form = document.getElementById('admin-form');
         let sessionPasswordMemory = ""; 
         let editingId = null; 
-        let globalAdminContentCache = []; // Internal global cache to enable instant localized searching
+        let globalAdminContentCache = []; 
+        let lockoutTimerInterval = null; // Memory tracking address holding visual tick reference instances
 
         async function verifyAdminKey() {
-            const inputKey = document.getElementById('admin-secret-key').value;
+            // Cancel operations if an active lockout cycle is actively processing
+            if (lockoutTimerInterval) return;
+
+            const inputKey = document.getElementById('admin-secret-key').value.trim();
+            if (!inputKey) {
+                alert("Please enter a password.");
+                return;
+            }
 
             try {
                 const res = await fetch(`${API_URL}/verify-password`, {
@@ -129,18 +137,61 @@
                     body: JSON.stringify({ password: inputKey })
                 });
 
-                if (res.ok) {
+                const data = await res.json();
+
+                if (res.ok && data.success) {
                     sessionPasswordMemory = inputKey; 
                     document.getElementById('admin-lockbox').remove();
                     document.getElementById('admin-content').classList.remove('hidden');
                     loadAdminList();
                 } else {
-                    alert("❌ ACCESS DENIED: Invalid Admin Password.");
-                    window.location.href = "index.html";
+                    // Check if the backend server responded with a 429 Brute-Force lockdown message
+                    if (res.status === 429 || data.retryAfter) {
+                        const totalSeconds = data.retryAfter || 1800; // 1800s fallback calculation matching 30m
+                        startLocalLockoutCountdown(totalSeconds);
+                    } else {
+                        alert(`❌ ACCESS DENIED: ${data.message || 'Invalid Admin Password.'}`);
+                    }
                 }
             } catch (err) {
-                alert("Server verification failed.");
+                alert("Server verification failed or network timeout.");
             }
+        }
+
+        function startLocalLockoutCountdown(seconds) {
+            const submitBtn = document.querySelector('#admin-lockbox button');
+            const passwordInput = document.getElementById('admin-secret-key');
+            
+            passwordInput.disabled = true;
+            passwordInput.value = "";
+            
+            clearInterval(lockoutTimerInterval);
+            let timeLeft = seconds;
+
+            lockoutTimerInterval = setInterval(() => {
+                if (timeLeft <= 0) {
+                    clearInterval(lockoutTimerInterval);
+                    lockoutTimerInterval = null;
+                    
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = "UNLOCK PANEL";
+                    submitBtn.className = "w-full bg-emerald-500 text-black font-bold py-2 rounded-lg cursor-pointer";
+                    passwordInput.disabled = false;
+                    passwordInput.placeholder = "Enter Admin Password";
+                } else {
+                    submitBtn.disabled = true;
+                    passwordInput.placeholder = "🔒 ACCESS LOCKED";
+                    
+                    const minutes = Math.floor(timeLeft / 60);
+                    const remainderSeconds = timeLeft % 60;
+                    const displaySeconds = remainderSeconds < 10 ? '0' + remainderSeconds : remainderSeconds;
+                    
+                    submitBtn.textContent = `⏳ LOCKED OUT (${minutes}:${displaySeconds})`;
+                    submitBtn.className = "w-full bg-red-950/40 text-red-400 font-bold py-2 rounded-lg cursor-not-allowed border border-red-900/50";
+                    
+                    timeLeft--;
+                }
+            }, 1000);
         }
 
         function toggleFormType() {
@@ -310,23 +361,18 @@
                 const res = await fetch(API_URL);
                 const data = await res.json();
                 
-                // Cache the data globally
                 globalAdminContentCache = data;
-                
-                // Run filtering engine (renders full list initially if search bar is blank)
                 filterAdminList();
             } catch (err) {
                 console.error("Error loading panel lists:", err);
             }
         }
 
-        // Dedicated array-filtering parser handles real-time lookups instantly
         function filterAdminList() {
             const searchKeyword = document.getElementById('admin-search-bar').value.toLowerCase().trim();
             const list = document.getElementById('admin-list');
             list.innerHTML = ""; 
 
-            // Filter cache using matching inputs
             const filteredItems = globalAdminContentCache.filter(item => {
                 return item._id.toString().toLowerCase().includes(searchKeyword);
             });
@@ -336,7 +382,6 @@
                 return;
             }
             
-            // XSS-Safe interface rendering
             filteredItems.forEach(item => {
                 const rowDiv = document.createElement('div');
                 rowDiv.className = "flex justify-between items-center bg-gray-900 p-3 rounded border border-gray-800";
