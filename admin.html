@@ -118,10 +118,25 @@
         let sessionPasswordMemory = ""; 
         let editingId = null; 
         let globalAdminContentCache = []; 
-        let lockoutTimerInterval = null; // Memory tracking address holding visual tick reference instances
+        let lockoutTimerInterval = null; 
+
+        // Evaluates persistent tracking data across layout initialization states
+        function checkExistingLockout() {
+            const lockoutUntil = localStorage.getItem('admin_lockout_until');
+            if (lockoutUntil) {
+                const now = Date.now();
+                const remainingMs = parseInt(lockoutUntil) - now;
+                
+                if (remainingMs > 0) {
+                    // Lockout timeframe is still running, fire up countdown loop instantly
+                    startLocalLockoutCountdown(Math.ceil(remainingMs / 1000));
+                } else {
+                    localStorage.removeItem('admin_lockout_until');
+                }
+            }
+        }
 
         async function verifyAdminKey() {
-            // Cancel operations if an active lockout cycle is actively processing
             if (lockoutTimerInterval) return;
 
             const inputKey = document.getElementById('admin-secret-key').value.trim();
@@ -141,13 +156,18 @@
 
                 if (res.ok && data.success) {
                     sessionPasswordMemory = inputKey; 
+                    localStorage.removeItem('admin_lockout_until'); 
                     document.getElementById('admin-lockbox').remove();
                     document.getElementById('admin-content').classList.remove('hidden');
                     loadAdminList();
                 } else {
-                    // Check if the backend server responded with a 429 Brute-Force lockdown message
                     if (res.status === 429 || data.retryAfter) {
-                        const totalSeconds = data.retryAfter || 1800; // 1800s fallback calculation matching 30m
+                        const totalSeconds = data.retryAfter || 1800; 
+                        
+                        // Map precise absolute unix milliseconds boundary target
+                        const lockoutEndTime = Date.now() + (totalSeconds * 1000);
+                        localStorage.setItem('admin_lockout_until', lockoutEndTime);
+
                         startLocalLockoutCountdown(totalSeconds);
                     } else {
                         alert(`❌ ACCESS DENIED: ${data.message || 'Invalid Admin Password.'}`);
@@ -172,6 +192,7 @@
                 if (timeLeft <= 0) {
                     clearInterval(lockoutTimerInterval);
                     lockoutTimerInterval = null;
+                    localStorage.removeItem('admin_lockout_until'); 
                     
                     submitBtn.disabled = false;
                     submitBtn.textContent = "UNLOCK PANEL";
@@ -511,6 +532,7 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             addMovieLinkField();
+            checkExistingLockout(); // Validates active ban states instantly on page load
         });
     </script>
 </body>
