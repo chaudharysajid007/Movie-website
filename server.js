@@ -2,7 +2,6 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit'); 
-const crypto = require('crypto'); // Built-in Node crypto module
 require('dotenv').config();
 
 const contentRoutes = require('./routes/contentRoutes');
@@ -50,65 +49,8 @@ mongoose.connect(mongoURI)
 // Apply specific rate limiting to your password verification endpoint route
 app.use('/api/content/verify-password', passwordVerifyLimiter);
 
-// Routes Map
+// Routes Map - This maps all nested routes inside contentRoutes to begin with /api/content
 app.use('/api/content', contentRoutes);
-
-/**
- * 🔐 DYNAMIC LINK REDIRECT GATEWAY
- * Route: GET /api/content/download/:token
- * Decrypts the link token, matches IP constraints, and checks 11-hour expiration.
- */
-app.get('/api/content/download/:token', (req, res) => {
-    try {
-        const { token } = req.params;
-        const secret = process.env.LINK_SECRET || "sajidflix_ultra_secure_key_123";
-        
-        // Decrypt the token payload
-        const key = crypto.scryptSync(secret, 'salt', 32);
-        const iv = Buffer.alloc(16, 0);
-        const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
-        
-        let decrypted = decipher.update(token, 'hex', 'utf8');
-        decrypted += decipher.final('utf8');
-        
-        const payload = JSON.parse(decrypted);
-        
-        // Extract client's true IP address
-        const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-
-        // 🛡️ SECURITY CHECK 1: Expiration Lifespan (11 Hours)
-        if (Date.now() > payload.expires) {
-            return res.status(403).send(`
-                <body style="background:#0b0f19;color:#f87171;font-family:sans-serif;text-align:center;padding-top:100px;">
-                    <h1>🚨 LINK EXPIRED</h1>
-                    <p style="color:#9ca3af;">This temporary download link has expired (11-hour limit exceeded). Please refresh the movie details page to request a new download path.</p>
-                </body>
-            `);
-        }
-
-        // 🛡️ SECURITY CHECK 2: IP Bound Locking Verification
-        if (payload.ip !== clientIp) {
-             return res.status(403).send(`
-                <body style="background:#0b0f19;color:#f87171;font-family:sans-serif;text-align:center;padding-top:100px;">
-                    <h1>🔒 ACCESS DENIED</h1>
-                    <p style="color:#9ca3af;">This link is tightly locked to another IP address. Links cannot be shared across multiple devices or networks.</p>
-                </body>
-            `);
-        }
-
-        // ✅ All checks passed! Silently forward user straight to Driveseed
-        return res.redirect(302, payload.url);
-
-    } catch (err) {
-        console.error("Link Decryption Failure:", err.message);
-        return res.status(400).send(`
-            <body style="background:#0b0f19;color:#f87171;font-family:sans-serif;text-align:center;padding-top:100px;">
-                <h1>⚠️ INVALID DOWNLOAD REF</h1>
-                <p style="color:#9ca3af;">The security token signature is broken or has been modified maliciously.</p>
-            </body>
-        `);
-    }
-});
 
 app.get('/', (req, res) => {
   res.send('Movie Website API Engine is running perfectly online!');

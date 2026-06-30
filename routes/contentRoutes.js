@@ -30,7 +30,8 @@ function encryptUrl(realUrl, userIp) {
     let token = cipher.update(payload, 'utf8', 'hex');
     token += cipher.final('hex');
     
-    return `/api/content/download/${token}`;
+    // FIXED: Prepended the real domain to prevent GitHub page breakage
+    return `https://guarded-caverns-13017-b15ead89228a.herokuapp.com/api/content/download/${token}`;
   } catch (err) {
     console.error("Encryption Failure:", err.message);
     return realUrl; // Fallback to raw link if crypto fails
@@ -40,6 +41,63 @@ function encryptUrl(realUrl, userIp) {
 // ==========================================
 // USER PANEL ROUTES (Public Access via TMDb)
 // ==========================================
+
+/**
+ * 🔐 DYNAMIC LINK REDIRECT GATEWAY
+ * Route: GET /api/content/download/:token
+ * Decrypts the link token, matches IP constraints, and checks 11-hour expiration.
+ */
+router.get('/download/:token', (req, res) => {
+    try {
+        const { token } = req.params;
+        const secret = process.env.LINK_SECRET || "sajidflix_ultra_secure_key_123";
+        
+        // Decrypt the token payload
+        const key = crypto.scryptSync(secret, 'salt', 32);
+        const iv = Buffer.alloc(16, 0);
+        const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+        
+        let decrypted = decipher.update(token, 'hex', 'utf8');
+        decrypted += decipher.final('utf8');
+        
+        const payload = JSON.parse(decrypted);
+        
+        // Extract client's true IP address
+        const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
+        // 🛡️ SECURITY CHECK 1: Expiration Lifespan (11 Hours)
+        if (Date.now() > payload.expires) {
+            return res.status(403).send(`
+                <body style="background:#0b0f19;color:#f87171;font-family:sans-serif;text-align:center;padding-top:100px;">
+                    <h1>🚨 LINK EXPIRED</h1>
+                    <p style="color:#9ca3af;">This temporary download link has expired (11-hour limit exceeded). Please refresh the movie details page to request a new download path.</p>
+                </body>
+            `);
+        }
+
+        // 🛡️ SECURITY CHECK 2: IP Bound Locking Verification
+        if (payload.ip !== clientIp) {
+             return res.status(403).send(`
+                <body style="background:#0b0f19;color:#f87171;font-family:sans-serif;text-align:center;padding-top:100px;">
+                    <h1>🔒 ACCESS DENIED</h1>
+                    <p style="color:#9ca3af;">This link is tightly locked to another IP address. Links cannot be shared across multiple devices or networks.</p>
+                </body>
+            `);
+        }
+
+        // ✅ All checks passed! Silently forward user straight to Driveseed
+        return res.redirect(302, payload.url);
+
+    } catch (err) {
+        console.error("Link Decryption Failure:", err.message);
+        return res.status(400).send(`
+            <body style="background:#0b0f19;color:#f87171;font-family:sans-serif;text-align:center;padding-top:100px;">
+                <h1>⚠️ INVALID DOWNLOAD REF</h1>
+                <p style="color:#9ca3af;">The security token signature is broken or has been modified maliciously.</p>
+            </body>
+        `);
+    }
+});
 
 // 1. Homepage Catalog: Fetches items with explicit database-layer optimization
 router.get('/', async (req, res) => {
@@ -113,7 +171,7 @@ router.get('/search', async (req, res) => {
   }
 });
 
-// 3. Get Single Item Details (🔒 SWAPS REAL DRIborderColor SEED LINKS WITH TEMPORARY TOKEN GATEWAYS)
+// 3. Get Single Item Details (🔒 SWAPS REAL DRIVESEED LINKS WITH TEMPORARY TOKEN GATEWAYS)
 router.get('/:id', async (req, res) => {
   const tmdbId = req.params.id;
   const { type } = req.query; 
@@ -155,7 +213,7 @@ router.get('/:id', async (req, res) => {
             batchLink: res.batchLink ? encryptUrl(res.batchLink, clientIp) : null,
             episodes: res.episodes.map(ep => ({
               episodeNumber: ep.episodeNumber,
-              downloadUrl: encryptUrl(ep.downloadUrl, clientIp) // Safe episode paths
+              downloadUrl: encryptUrl(ep.downloadUrl, clientIp) 
             }))
           }))
         }));
@@ -169,8 +227,8 @@ router.get('/:id', async (req, res) => {
       coverImageUrl: `https://image.tmdb.org/t/p/w500${metadata.poster_path}`,
       screenshots: backdrops,
       type: type === 'series' ? 'series' : 'movie',
-      movieLinks: secureMovieLinks, // Returns safe, encrypted tokens only
-      seasons: secureSeasons,       // Returns safe, encrypted tokens only
+      movieLinks: secureMovieLinks, 
+      seasons: secureSeasons,       
       hasLinks: !!localRecord 
     });
   } catch (err) {
@@ -252,7 +310,7 @@ router.put('/edit/:id', async (req, res) => {
     if (!updatedItem) return res.status(404).json({ message: 'Content not found' });
     res.json(updatedItem);
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    Instance.status(400).json({ message: err.message });
   }
 });
 
